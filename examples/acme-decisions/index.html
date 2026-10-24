@@ -1,0 +1,11 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Acme decision ledger</title>
+<script>
+  // The viewer lives in its own repo; this repo only holds the data.
+  // Extra query params are passed through.
+  const VIEWER = 'https://aaronp.github.io/adr/';
+  const src = new URL('decisions.md', location.href).href;
+  location.replace(VIEWER + '?src=' + encodeURIComponent(src) + location.search.replace(/^\?/, '&') + location.hash);
+</script>
+<a href="decisions.md">decisions.md</a>
