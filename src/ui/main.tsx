@@ -15,6 +15,7 @@ import { Dashboard } from './components/Dashboard.tsx';
 import { AdrView } from './components/AdrView.tsx';
 import { EditForm } from './components/EditForm.tsx';
 import { MarkdownView } from './components/MarkdownView.tsx';
+import { OpenDialog } from './components/OpenDialog.tsx';
 import type { Effects } from './components/common.tsx';
 
 interface AppProps {
@@ -107,7 +108,14 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
           (text) => dispatch({ type: 'md/load', text, source: file.name }),
           (e: unknown) => dispatch({ type: 'toast/show', kind: 'error', text: e instanceof Error ? e.message : String(e) })
         );
-      }
+      },
+      openUrl: (url) =>
+        fetchText(url).then(
+          (r) => dispatch({ type: 'md/load', text: r.markdown, source: r.url }),
+          (e: unknown) => {
+            throw new Error(`Could not open ${url}: ${e instanceof Error ? e.message : String(e)}. A URL on another site must allow cross-origin requests (GitHub Pages and raw.githubusercontent.com do).`);
+          }
+        )
     }),
     []
   );
@@ -141,6 +149,7 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
     <div class="app">
       <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} dispatch={dispatch} />
       {body}
+      {state.openDialog ? <OpenDialog dispatch={dispatch} fx={fx} /> : null}
       <div class="toast-host" aria-live="polite">
         {state.toast !== null ? (
           <div class={`toast toast-${state.toast.kind}`} role={state.toast.kind === 'error' ? 'alert' : 'status'}>

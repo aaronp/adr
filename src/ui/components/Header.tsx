@@ -33,6 +33,9 @@ export const Header = ({ theme, todayLabel, onNew, dispatch }: { theme: ThemeId;
         <button type="button" class="chrome-link" onClick={() => dispatch({ type: 'nav/dashboard' })}>
           All decisions
         </button>
+        <button type="button" class="chrome-link" onClick={() => dispatch({ type: 'open/show' })}>
+          <Icon name="folder" /> Open
+        </button>
         <button type="button" class="chrome-link" onClick={() => dispatch({ type: 'nav/markdown', focusId: null })}>
           <Icon name="code" /> Markdown
         </button>

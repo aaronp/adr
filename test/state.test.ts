@@ -103,3 +103,14 @@ test('a ?src= file that does not parse opens the markdown view and names the URL
   assert.equal(s.adrs.length, 0);
   assert.match(s.md.error?.message ?? '', /https:\/\/example\.org\/bad\.md could not be loaded/);
 });
+
+test('the Open dialog shows, hides, and closes once a file loads (or fails to parse)', () => {
+  const shown = run(fresh(), { type: 'open/show' });
+  assert.equal(shown.openDialog, true);
+  assert.equal(run(shown, { type: 'open/hide' }).openDialog, false);
+  const one = serializeLedger(parseLedger(readSample()).slice(0, 1));
+  assert.equal(run(shown, { type: 'md/load', text: one, source: 'https://example.org/d.md' }).openDialog, false);
+  const bad = run(shown, { type: 'md/load', text: 'nope', source: 'x.md' });
+  assert.equal(bad.openDialog, false);
+  assert.equal(bad.screen.kind, 'markdown');
+});

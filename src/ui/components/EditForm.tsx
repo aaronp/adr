@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { Role, Status } from '../../core/schema.ts';
 import { ROLES, STATUSES } from '../../core/schema.ts';
 import { plural } from '../../core/dates.ts';
@@ -8,6 +8,8 @@ import { validateAdr } from '../../core/validate.ts';
 import type { Adr } from '../../core/schema.ts';
 import { rampColor, seriesColor } from '../themes.ts';
 import { Avatar, Icon, Kicker, Swatch, statusLabel, type Dispatch } from './common.tsx';
+
+type TabId = 'basics' | 'criteria' | 'people' | 'solutions' | 'decision';
 
 const ROLE_LABEL: Record<Role, string> = { decider: 'Decider', author: 'Author', consulted: 'Consulted', informed: 'Informed' };
 
@@ -37,6 +39,45 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch
   const model = scoreModel(d);
   const isNew = originalId === null;
   const save = () => dispatch({ type: 'edit/save' });
+  /* Sections as vertical tabs; which one is open is view-only, so it lives here rather than in the reducer. */
+  const [tab, setTab] = useState<TabId>('basics');
+  const decided = model.rows.find((r) => r.solution.id === d.decision);
+  const tabs: readonly { id: TabId; label: string; note: string }[] = [
+    { id: 'basics', label: 'Basics', note: '' },
+    { id: 'criteria', label: 'Criteria', note: String(d.criteria.length) },
+    { id: 'people', label: 'People', note: String(d.people.length) },
+    { id: 'solutions', label: 'Solutions', note: String(d.solutions.length) },
+    { id: 'decision', label: 'Decision', note: d.decision === '' ? 'open' : decided === undefined ? '' : '✓' }
+  ];
+  /* The side panels jump to a solution or criterion: open its tab (and the solution's card), then focus its name field once drawn. */
+  const [focusId, setFocusId] = useState<string | null>(null);
+  useEffect(() => {
+    if (focusId === null) return;
+    const el = document.getElementById(focusId);
+    if (el === null) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.focus({ preventScroll: true });
+    setFocusId(null);
+  }, [focusId, tab, open]);
+  const goToSolution = (id: string) => {
+    if (open[id] !== true) dispatch({ type: 'edit/toggleOpen', solutionId: id });
+    setTab('solutions');
+    setFocusId(`sn-${id}`);
+  };
+  const goToCriterion = (id: string) => {
+    setTab('criteria');
+    setFocusId(`cn-${id}`);
+  };
+  const onTabKey = (e: KeyboardEvent) => {
+    const i = tabs.findIndex((t) => t.id === tab);
+    const next = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    const t = tabs[(next + tabs.length) % tabs.length];
+    if (t === undefined) throw new Error('bug: tab index out of range');
+    setTab(t.id);
+    document.getElementById(`tab-${t.id}`)?.focus();
+  };
 
   return (
     <main>
@@ -76,286 +117,310 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch
             </div>
           ) : null}
 
-          <fieldset class="card pad stack-m">
-            <legend class="legend">
-              <span class="mono legend-n">01</span>Basics
-            </legend>
-            <div class="grid-auto">
-              <div class="field">
-                <label for="f-id">ID</label>
-                <input id="f-id" class="input mono" value={d.id} onInput={(e) => update((x) => ({ ...x, id: e.currentTarget.value }))} />
-              </div>
-              <div class="field">
-                <label for="f-status">Status</label>
-                <select id="f-status" class="input" value={d.status} onChange={(e) => update((x) => ({ ...x, status: e.currentTarget.value as Status }))}>
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel(s)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div class="field">
-                <label for="f-date">Decision date</label>
-                <input id="f-date" type="date" class="input" value={d.date} onInput={(e) => update((x) => ({ ...x, date: e.currentTarget.value }))} />
-              </div>
-              <div class="field">
-                <label for="f-revisit">
-                  Revisit on <span class="normal muted">(optional)</span>
-                </label>
-                <div class="row-xs">
-                  <input id="f-revisit" type="date" class="input" value={d.revisit} onInput={(e) => update((x) => ({ ...x, revisit: e.currentTarget.value }))} />
-                  <button type="button" class="icon-btn" aria-label="Clear revisit date" onClick={() => update((x) => ({ ...x, revisit: '' }))}>
-                    <Icon name="x" />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div class="field">
-              <label for="f-title">Title</label>
-              <input id="f-title" class="input input-title" value={d.title} placeholder="Choose a … for …" onInput={(e) => update((x) => ({ ...x, title: e.currentTarget.value }))} />
-            </div>
-            <div class="field">
-              <label for="f-tags">
-                Tags <span class="normal muted">(comma separated)</span>
-              </label>
-              <input id="f-tags" class="input mono" value={d.tagsText} placeholder="data, infrastructure" onInput={(e) => update((x) => ({ ...x, tagsText: e.currentTarget.value }))} />
-            </div>
-          </fieldset>
-
-          <fieldset class="card pad stack-m">
-            <legend class="legend">
-              <span class="mono legend-n">02</span>Goal &amp; hypothesis
-            </legend>
-            <div class="field">
-              <label for="f-goal">Goal — what must this decision achieve?</label>
-              <textarea id="f-goal" class="input input-lg" rows={3} value={d.goal} onInput={(e) => update((x) => ({ ...x, goal: e.currentTarget.value }))} />
-            </div>
-            <div class="grid-auto grid-wide">
-              {(
-                [
-                  ['believe', 'We believe…', 'the change we are making'],
-                  ['willResultIn', '…will result in…', 'the outcome we expect'],
-                  ['measuredBy', 'We’ll know when…', 'the signal or metric that proves it']
-                ] as const
-              ).map(([key, label, ph]) => (
-                <div key={key} class="field">
-                  <label for={`f-h-${key}`} class="hyp-label">
-                    {label}
-                  </label>
-                  <textarea
-                    id={`f-h-${key}`}
-                    class="input"
-                    rows={3}
-                    placeholder={ph}
-                    value={d.hypothesis[key]}
-                    onInput={(e) => {
-                      const v = e.currentTarget.value;
-                      update((x) => ({ ...x, hypothesis: { ...x.hypothesis, [key]: v } }));
-                    }}
-                  />
-                </div>
+          <div class="vtabs-layout">
+            <div role="tablist" aria-orientation="vertical" aria-label="Sections" class="vtabs" onKeyDown={onTabKey}>
+              {tabs.map((t, i) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  id={`tab-${t.id}`}
+                  aria-selected={tab === t.id}
+                  aria-controls="edit-panel"
+                  tabIndex={tab === t.id ? 0 : -1}
+                  class={`vtab${tab === t.id ? ' on' : ''}`}
+                  onClick={() => setTab(t.id)}
+                >
+                  <span class="mono legend-n">{String(i + 1).padStart(2, '0')}</span>
+                  <span class="grow-main">{t.label}</span>
+                  {t.note === '' ? null : <span class="mono small muted">{t.note}</span>}
+                </button>
               ))}
             </div>
-          </fieldset>
-
-          <fieldset class="card pad stack-s">
-            <legend class="legend">
-              <span class="mono legend-n">03</span>People
-            </legend>
-            {d.people.map((p) => (
-              <div key={p.rowId} class="row-fields">
-                <Avatar person={p} size={36} />
-                <div class="field grow-main">
-                  <label for={`pn-${p.rowId}`}>Name</label>
-                  <input
-                    id={`pn-${p.rowId}`}
-                    class="input"
-                    value={p.name}
-                    onInput={(e) => {
-                      const v = e.currentTarget.value;
-                      update((x) => ({ ...x, people: x.people.map((q) => (q.rowId === p.rowId ? { ...q, name: v } : q)) }));
-                    }}
-                  />
-                </div>
-                <div class="field field-role">
-                  <label for={`pr-${p.rowId}`}>Role</label>
-                  <select
-                    id={`pr-${p.rowId}`}
-                    class="input"
-                    value={p.role}
-                    onChange={(e) => {
-                      const v = e.currentTarget.value as Role;
-                      update((x) => ({ ...x, people: x.people.map((q) => (q.rowId === p.rowId ? { ...q, role: v } : q)) }));
-                    }}
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABEL[r]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button type="button" class="icon-btn" aria-label={`Remove ${p.name === '' ? 'this person' : p.name}`} onClick={() => update((x) => ({ ...x, people: x.people.filter((q) => q.rowId !== p.rowId) }))}>
-                  <Icon name="x" />
-                </button>
-              </div>
-            ))}
-            <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addPerson' })}>
-              <Icon name="plus" /> Add person
-            </button>
-          </fieldset>
-
-          <fieldset class="card pad stack-s">
-            <legend class="legend">
-              <span class="mono legend-n">04</span>Criteria &amp; weights
-            </legend>
-            <span class="small-plus muted">Weight each criterion 1 (nice to have) to 5 (critical). Shares update as you go.</span>
-            {d.criteria.map((c) => {
-              const name = c.name === '' ? 'this criterion' : c.name;
-              return (
-                <div key={c.id} class="sub-card stack-s">
-                  <div class="row-fields">
-                    <div class="field grow-main">
-                      <label for={`cn-${c.id}`}>Criterion</label>
-                      <input
-                        id={`cn-${c.id}`}
-                        class="input strong"
-                        value={c.name}
-                        onInput={(e) => {
-                          const v = e.currentTarget.value;
-                          update((x) => ({ ...x, criteria: x.criteria.map((q) => (q.id === c.id ? { ...q, name: v } : q)) }));
-                        }}
-                      />
+            <div role="tabpanel" id="edit-panel" aria-labelledby={`tab-${tab}`} class="vtab-panel stack-m">
+              {tab === 'basics' ? (
+                <fieldset class="card pad stack-m">
+                  <legend class="legend">Basics</legend>
+                  <div class="grid-auto">
+                    <div class="field">
+                      <label for="f-id">ID</label>
+                      <input id="f-id" class="input mono" value={d.id} onInput={(e) => update((x) => ({ ...x, id: e.currentTarget.value }))} />
                     </div>
-                    <div class="field" role="group" aria-label={`Weight for ${name}`}>
-                      <span class="field-label">Weight · {c.weight === null ? 'not set' : `${model.totalWeight > 0 ? Math.round((c.weight / model.totalWeight) * 100) : 0}% of total`}</span>
-                      <Scale value={c.weight} label={(n) => `Weight ${n}`} onPick={(n) => update((x) => ({ ...x, criteria: x.criteria.map((q) => (q.id === c.id ? { ...q, weight: n } : q)) }))} />
+                    <div class="field">
+                      <label for="f-status">Status</label>
+                      <select id="f-status" class="input" value={d.status} onChange={(e) => update((x) => ({ ...x, status: e.currentTarget.value as Status }))}>
+                        {STATUSES.map((s) => (
+                          <option key={s} value={s}>
+                            {statusLabel(s)}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <button type="button" class="icon-btn" aria-label={`Remove ${name}`} onClick={() => update((x) => removeCriterion(x, c.id))}>
-                      <Icon name="x" />
-                    </button>
+                    <div class="field">
+                      <label for="f-date">Decision date</label>
+                      <input id="f-date" type="date" class="input" value={d.date} onInput={(e) => update((x) => ({ ...x, date: e.currentTarget.value }))} />
+                    </div>
+                    <div class="field">
+                      <label for="f-revisit">
+                        Revisit on <span class="normal muted">(optional)</span>
+                      </label>
+                      <div class="row-xs">
+                        <input id="f-revisit" type="date" class="input" value={d.revisit} onInput={(e) => update((x) => ({ ...x, revisit: e.currentTarget.value }))} />
+                        <button type="button" class="icon-btn" aria-label="Clear revisit date" onClick={() => update((x) => ({ ...x, revisit: '' }))}>
+                          <Icon name="x" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div class="field">
-                    <label for={`cd-${c.id}`}>What a high score means</label>
-                    <input
-                      id={`cd-${c.id}`}
-                      class="input"
-                      value={c.description}
-                      onInput={(e) => {
-                        const v = e.currentTarget.value;
-                        update((x) => ({ ...x, criteria: x.criteria.map((q) => (q.id === c.id ? { ...q, description: v } : q)) }));
-                      }}
-                    />
+                    <label for="f-title">Title</label>
+                    <input id="f-title" class="input input-title" value={d.title} placeholder="Choose a … for …" onInput={(e) => update((x) => ({ ...x, title: e.currentTarget.value }))} />
                   </div>
-                </div>
-              );
-            })}
-            <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addCriterion' })}>
-              <Icon name="plus" /> Add criterion
-            </button>
-          </fieldset>
+                  <div class="field">
+                    <label for="f-tags">
+                      Tags <span class="normal muted">(comma separated)</span>
+                    </label>
+                    <input id="f-tags" class="input mono" value={d.tagsText} placeholder="data, infrastructure" onInput={(e) => update((x) => ({ ...x, tagsText: e.currentTarget.value }))} />
+                  </div>
+                </fieldset>
+              ) : null}
 
-          <fieldset class="card pad stack-s">
-            <legend class="legend">
-              <span class="mono legend-n">05</span>Proposed solutions &amp; scores
-            </legend>
-            <span class="small-plus muted">Score every solution 1–5 against each criterion. Leave a score empty if it is not agreed yet — it shows as unscored, never as zero.</span>
-            {model.rows.map((r) => {
-              const s = r.solution;
-              const isOpen = open[s.id] === true;
-              const label = s.name === '' ? 'Untitled solution' : s.name;
-              const setField = (field: 'name' | 'summary' | 'prosText' | 'consText', v: string) =>
-                update((x) => ({ ...x, solutions: x.solutions.map((q) => (q.id === s.id ? { ...q, [field]: v } : q)) }));
-              return (
-                <div key={s.id} class="sol-card">
-                  <div class="sol-head">
-                    <button type="button" class="sol-toggle" aria-expanded={isOpen} onClick={() => dispatch({ type: 'edit/toggleOpen', solutionId: s.id })}>
-                      <Swatch color={seriesColor(r.index)} size={12} />
-                      <span class="grow-main strong">{label}</span>
-                      <span class="mono small muted">
-                        {d.criteria.length - r.missing}/{d.criteria.length} scored
-                      </span>
-                      <span class="mono strong sol-score">{r.complete ? scoreLabel(r) : '—'}</span>
-                      <Icon name={isOpen ? 'up' : 'down'} size={20} />
-                    </button>
-                    <button type="button" class="icon-btn icon-btn-bad" aria-label={`Remove ${label}`} onClick={() => update((x) => removeSolution(x, s.id))}>
-                      <Icon name="trash" size={18} />
-                    </button>
+              {tab === 'basics' ? (
+                <fieldset class="card pad stack-m">
+                  <legend class="legend">Goal &amp; hypothesis</legend>
+                  <div class="field">
+                    <label for="f-goal">Goal — what must this decision achieve?</label>
+                    <textarea id="f-goal" class="input input-lg" rows={3} value={d.goal} onInput={(e) => update((x) => ({ ...x, goal: e.currentTarget.value }))} />
                   </div>
-                  {isOpen ? (
-                    <div class="sol-body stack-m">
-                      <div class="field">
-                        <label for={`sn-${s.id}`}>Solution name</label>
-                        <input id={`sn-${s.id}`} class="input strong" value={s.name} onInput={(e) => setField('name', e.currentTarget.value)} />
+                  <div class="grid-auto grid-wide">
+                    {(
+                      [
+                        ['believe', 'We believe…', 'the change we are making'],
+                        ['willResultIn', '…will result in…', 'the outcome we expect'],
+                        ['measuredBy', 'We’ll know when…', 'the signal or metric that proves it']
+                      ] as const
+                    ).map(([key, label, ph]) => (
+                      <div key={key} class="field">
+                        <label for={`f-h-${key}`} class="hyp-label">
+                          {label}
+                        </label>
+                        <textarea
+                          id={`f-h-${key}`}
+                          class="input"
+                          rows={3}
+                          placeholder={ph}
+                          value={d.hypothesis[key]}
+                          onInput={(e) => {
+                            const v = e.currentTarget.value;
+                            update((x) => ({ ...x, hypothesis: { ...x.hypothesis, [key]: v } }));
+                          }}
+                        />
                       </div>
-                      <div class="field">
-                        <label for={`ss-${s.id}`}>Summary</label>
-                        <textarea id={`ss-${s.id}`} class="input" rows={2} value={s.summary} onInput={(e) => setField('summary', e.currentTarget.value)} />
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+
+              {tab === 'people' ? (
+                <fieldset class="card pad stack-s">
+                  <legend class="legend">People</legend>
+                  {d.people.map((p) => (
+                    <div key={p.rowId} class="row-fields">
+                      <Avatar person={p} size={36} />
+                      <div class="field grow-main">
+                        <label for={`pn-${p.rowId}`}>Name</label>
+                        <input
+                          id={`pn-${p.rowId}`}
+                          class="input"
+                          value={p.name}
+                          onInput={(e) => {
+                            const v = e.currentTarget.value;
+                            update((x) => ({ ...x, people: x.people.map((q) => (q.rowId === p.rowId ? { ...q, name: v } : q)) }));
+                          }}
+                        />
                       </div>
-                      <div>
-                        <span class="field-label">Scores against criteria</span>
-                        {d.criteria.length === 0 ? <span class="small muted">Add criteria above to score this solution.</span> : null}
-                        {d.criteria.map((c) => {
-                          const v = scoreOf(s, c.id);
-                          const cname = c.name === '' ? 'Untitled criterion' : c.name;
-                          return (
-                            <div key={c.id} class="score-edit" role="group" aria-label={`Score for ${label} on ${cname}`}>
-                              <span class="grow-main stack-xxs">
-                                <span class="small-plus medium">{cname}</span>
-                                <span class="mono tiny muted">weight ×{c.weight === null ? '?' : c.weight}</span>
-                              </span>
-                              <Scale value={v} label={(n) => `Score ${n} for ${cname}`} onPick={(n) => update((x) => setScore(x, s.id, c.id, n))} />
-                              <button type="button" class="scale-btn scale-clear" aria-label={`Clear score for ${cname}`} disabled={v === null} onClick={() => update((x) => setScore(x, s.id, c.id, null))}>
-                                –
-                              </button>
-                            </div>
-                          );
-                        })}
+                      <div class="field field-role">
+                        <label for={`pr-${p.rowId}`}>Role</label>
+                        <select
+                          id={`pr-${p.rowId}`}
+                          class="input"
+                          value={p.role}
+                          onChange={(e) => {
+                            const v = e.currentTarget.value as Role;
+                            update((x) => ({ ...x, people: x.people.map((q) => (q.rowId === p.rowId ? { ...q, role: v } : q)) }));
+                          }}
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABEL[r]}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <div class="two-col">
-                        <div class="field">
-                          <label for={`sp-${s.id}`} class="good">
-                            Pros <span class="normal muted">(one per line)</span>
-                          </label>
-                          <textarea id={`sp-${s.id}`} class="input" rows={3} value={s.prosText} onInput={(e) => setField('prosText', e.currentTarget.value)} />
-                        </div>
-                        <div class="field">
-                          <label for={`sc-${s.id}`} class="bad">
-                            Cons <span class="normal muted">(one per line)</span>
-                          </label>
-                          <textarea id={`sc-${s.id}`} class="input" rows={3} value={s.consText} onInput={(e) => setField('consText', e.currentTarget.value)} />
-                        </div>
-                      </div>
+                      <button type="button" class="icon-btn" aria-label={`Remove ${p.name === '' ? 'this person' : p.name}`} onClick={() => update((x) => ({ ...x, people: x.people.filter((q) => q.rowId !== p.rowId) }))}>
+                        <Icon name="x" />
+                      </button>
                     </div>
-                  ) : null}
-                </div>
-              );
-            })}
-            <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addSolution' })}>
-              <Icon name="plus" /> Add solution
-            </button>
-          </fieldset>
-
-          <fieldset class="card pad stack-m">
-            <legend class="legend">
-              <span class="mono legend-n">06</span>Decision
-            </legend>
-            <div class="chips" role="group" aria-label="Chosen solution">
-              {[{ id: '', name: 'No decision yet', color: 'var(--control-border)' }, ...model.rows.map((r) => ({ id: r.solution.id, name: r.solution.name === '' ? 'Untitled solution' : r.solution.name, color: seriesColor(r.index) }))].map(
-                (o) => (
-                  <button key={o.id} type="button" class={`chip chip-square${d.decision === o.id ? ' on' : ''}`} aria-pressed={d.decision === o.id} onClick={() => update((x) => ({ ...x, decision: o.id }))}>
-                    <Swatch color={o.color} />
-                    {o.name}
+                  ))}
+                  <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addPerson' })}>
+                    <Icon name="plus" /> Add person
                   </button>
-                )
-              )}
+                </fieldset>
+              ) : null}
+
+              {tab === 'criteria' ? (
+                <fieldset class="card pad stack-s">
+                  <legend class="legend">Criteria &amp; weights</legend>
+                  <span class="small-plus muted">Weight each criterion 1 (nice to have) to 5 (critical). Shares update as you go.</span>
+                  {d.criteria.map((c) => {
+                    const name = c.name === '' ? 'this criterion' : c.name;
+                    return (
+                      <div key={c.id} class="sub-card stack-s">
+                        <div class="row-fields">
+                          <div class="field grow-main">
+                            <label for={`cn-${c.id}`}>Criterion</label>
+                            <input
+                              id={`cn-${c.id}`}
+                              class="input strong"
+                              value={c.name}
+                              onInput={(e) => {
+                                const v = e.currentTarget.value;
+                                update((x) => ({ ...x, criteria: x.criteria.map((q) => (q.id === c.id ? { ...q, name: v } : q)) }));
+                              }}
+                            />
+                          </div>
+                          <div class="field" role="group" aria-label={`Weight for ${name}`}>
+                            <span class="field-label">Weight · {c.weight === null ? 'not set' : `${model.totalWeight > 0 ? Math.round((c.weight / model.totalWeight) * 100) : 0}% of total`}</span>
+                            <Scale value={c.weight} label={(n) => `Weight ${n}`} onPick={(n) => update((x) => ({ ...x, criteria: x.criteria.map((q) => (q.id === c.id ? { ...q, weight: n } : q)) }))} />
+                          </div>
+                          <button type="button" class="icon-btn" aria-label={`Remove ${name}`} onClick={() => update((x) => removeCriterion(x, c.id))}>
+                            <Icon name="x" />
+                          </button>
+                        </div>
+                        <div class="field">
+                          <label for={`cd-${c.id}`}>What a high score means</label>
+                          <input
+                            id={`cd-${c.id}`}
+                            class="input"
+                            value={c.description}
+                            onInput={(e) => {
+                              const v = e.currentTarget.value;
+                              update((x) => ({ ...x, criteria: x.criteria.map((q) => (q.id === c.id ? { ...q, description: v } : q)) }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addCriterion' })}>
+                    <Icon name="plus" /> Add criterion
+                  </button>
+                </fieldset>
+              ) : null}
+
+              {tab === 'solutions' ? (
+                <fieldset class="card pad stack-s">
+                  <legend class="legend">Proposed solutions &amp; scores</legend>
+                  <span class="small-plus muted">Score every solution 1–5 against each criterion. Leave a score empty if it is not agreed yet — it shows as unscored, never as zero.</span>
+                  {model.rows.map((r) => {
+                    const s = r.solution;
+                    const isOpen = open[s.id] === true;
+                    const label = s.name === '' ? 'Untitled solution' : s.name;
+                    const setField = (field: 'name' | 'summary' | 'prosText' | 'consText', v: string) =>
+                      update((x) => ({ ...x, solutions: x.solutions.map((q) => (q.id === s.id ? { ...q, [field]: v } : q)) }));
+                    return (
+                      <div key={s.id} class="sol-card">
+                        <div class="sol-head">
+                          <button type="button" class="sol-toggle" aria-expanded={isOpen} onClick={() => dispatch({ type: 'edit/toggleOpen', solutionId: s.id })}>
+                            <Swatch color={seriesColor(r.index)} size={12} />
+                            <span class="grow-main strong">{label}</span>
+                            <span class="mono small muted">
+                              {d.criteria.length - r.missing}/{d.criteria.length} scored
+                            </span>
+                            <span class="mono strong sol-score">{r.complete ? scoreLabel(r) : '—'}</span>
+                            <Icon name={isOpen ? 'up' : 'down'} size={20} />
+                          </button>
+                          <button type="button" class="icon-btn icon-btn-bad" aria-label={`Remove ${label}`} onClick={() => update((x) => removeSolution(x, s.id))}>
+                            <Icon name="trash" size={18} />
+                          </button>
+                        </div>
+                        {isOpen ? (
+                          <div class="sol-body stack-m">
+                            <div class="field">
+                              <label for={`sn-${s.id}`}>Solution name</label>
+                              <input id={`sn-${s.id}`} class="input strong" value={s.name} onInput={(e) => setField('name', e.currentTarget.value)} />
+                            </div>
+                            <div class="field">
+                              <label for={`ss-${s.id}`}>Summary</label>
+                              <textarea id={`ss-${s.id}`} class="input" rows={2} value={s.summary} onInput={(e) => setField('summary', e.currentTarget.value)} />
+                            </div>
+                            <div>
+                              <span class="field-label">Scores against criteria</span>
+                              {d.criteria.length === 0 ? <span class="small muted">Add criteria above to score this solution.</span> : null}
+                              {d.criteria.map((c) => {
+                                const v = scoreOf(s, c.id);
+                                const cname = c.name === '' ? 'Untitled criterion' : c.name;
+                                return (
+                                  <div key={c.id} class="score-edit" role="group" aria-label={`Score for ${label} on ${cname}`}>
+                                    <span class="grow-main stack-xxs">
+                                      <span class="small-plus medium">{cname}</span>
+                                      <span class="mono tiny muted">weight ×{c.weight === null ? '?' : c.weight}</span>
+                                    </span>
+                                    <Scale value={v} label={(n) => `Score ${n} for ${cname}`} onPick={(n) => update((x) => setScore(x, s.id, c.id, n))} />
+                                    <button type="button" class="scale-btn scale-clear" aria-label={`Clear score for ${cname}`} disabled={v === null} onClick={() => update((x) => setScore(x, s.id, c.id, null))}>
+                                      –
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div class="two-col">
+                              <div class="field">
+                                <label for={`sp-${s.id}`} class="good">
+                                  Pros <span class="normal muted">(one per line)</span>
+                                </label>
+                                <textarea id={`sp-${s.id}`} class="input" rows={3} value={s.prosText} onInput={(e) => setField('prosText', e.currentTarget.value)} />
+                              </div>
+                              <div class="field">
+                                <label for={`sc-${s.id}`} class="bad">
+                                  Cons <span class="normal muted">(one per line)</span>
+                                </label>
+                                <textarea id={`sc-${s.id}`} class="input" rows={3} value={s.consText} onInput={(e) => setField('consText', e.currentTarget.value)} />
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                  <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addSolution' })}>
+                    <Icon name="plus" /> Add solution
+                  </button>
+                </fieldset>
+              ) : null}
+
+              {tab === 'decision' ? (
+                <fieldset class="card pad stack-m">
+                  <legend class="legend">Decision</legend>
+                  <div class="chips" role="group" aria-label="Chosen solution">
+                    {[{ id: '', name: 'No decision yet', color: 'var(--control-border)' }, ...model.rows.map((r) => ({ id: r.solution.id, name: r.solution.name === '' ? 'Untitled solution' : r.solution.name, color: seriesColor(r.index) }))].map(
+                      (o) => (
+                        <button key={o.id} type="button" class={`chip chip-square${d.decision === o.id ? ' on' : ''}`} aria-pressed={d.decision === o.id} onClick={() => update((x) => ({ ...x, decision: o.id }))}>
+                          <Swatch color={o.color} />
+                          {o.name}
+                        </button>
+                      )
+                    )}
+                  </div>
+                  <div class="field">
+                    <label for="f-rationale">Rationale &amp; consequences</label>
+                    <textarea id="f-rationale" class="input" rows={4} value={d.rationale} onInput={(e) => update((x) => ({ ...x, rationale: e.currentTarget.value }))} />
+                  </div>
+                </fieldset>
+              ) : null}
+
             </div>
-            <div class="field">
-              <label for="f-rationale">Rationale &amp; consequences</label>
-              <textarea id="f-rationale" class="input" rows={4} value={d.rationale} onInput={(e) => update((x) => ({ ...x, rationale: e.currentTarget.value }))} />
-            </div>
-          </fieldset>
+          </div>
 
           {isNew ? null : (
             <div class="danger-zone">
@@ -381,16 +446,16 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch
         <aside class="split-side stack-m">
           <section aria-labelledby="prev-h" class="card pad stack-s">
             <Kicker as="h2" id="prev-h">
-              Live ranking
+              Rankings
             </Kicker>
             {d.criteria.length > 0 && d.solutions.length > 0 ? (
               model.ranked.map((r) => (
                 <div key={r.solution.id} class="stack-xxs">
                   <div class="row-between small-plus">
-                    <span class="row-s strong">
+                    <button type="button" class="side-link row-s strong" title="Edit this solution" onClick={() => goToSolution(r.solution.id)}>
                       <Swatch color={seriesColor(r.index)} />
-                      {r.solution.name === '' ? 'Untitled solution' : r.solution.name}
-                    </span>
+                      <span class="side-link-text">{r.solution.name === '' ? 'Untitled solution' : r.solution.name}</span>
+                    </button>
                     <span class="mono">{scoreLabel(r)}</span>
                   </div>
                   <span class="meter meter-m">
@@ -413,10 +478,10 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch
             </div>
             {d.criteria.map((c, i) => (
               <div key={c.id} class="row-between small">
-                <span class="row-s">
+                <button type="button" class="side-link row-s" title="Edit this criterion" onClick={() => goToCriterion(c.id)}>
                   <Swatch color={rampColor(i)} />
-                  {c.name === '' ? 'Untitled criterion' : c.name}
-                </span>
+                  <span class="side-link-text">{c.name === '' ? 'Untitled criterion' : c.name}</span>
+                </button>
                 <span class="mono">{c.weight === null ? 'not set' : `${model.totalWeight > 0 ? Math.round((c.weight / model.totalWeight) * 100) : 0}%`}</span>
               </div>
             ))}

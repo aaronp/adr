@@ -10,6 +10,8 @@ export interface Effects {
   copy(text: string, what: string): void;
   download(fileName: string, text: string): void;
   openFile(file: File): void;
+  /** Fetches a URL and loads it; rejects with a message to show, so the caller can keep its dialog open. */
+  openUrl(url: string): Promise<void>;
 }
 
 const ICONS = {
@@ -26,6 +28,7 @@ const ICONS = {
   copy: 'M9 9h10v10H9zM5 15V5h10',
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   upload: 'M12 20V9M7 14l5-5 5 5M5 4h14',
+  folder: 'M3 6h6l2 2h10v11H3z',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   reset: 'M4 12a8 8 0 1 0 3-6.2M4 4v5h5'
 } as const;

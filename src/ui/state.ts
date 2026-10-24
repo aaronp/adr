@@ -54,6 +54,8 @@ export interface State {
   /** Monotonic counter for generated ids (criteria, solutions, people, toasts) — keeps the reducer deterministic. */
   readonly seq: number;
   readonly toast: Toast | null;
+  /** The Open dialog (drop, pick or fetch a file) is showing. */
+  readonly openDialog: boolean;
 }
 
 export interface InitInput {
@@ -109,7 +111,8 @@ const createStartState = (input: InitInput): State => {
     filter: 'all' as Filter,
     expanded: {},
     hidden: {},
-    seq: 1
+    seq: 1,
+    openDialog: false
   };
   const badTheme = input.storedTheme !== null && !isThemeId(input.storedTheme);
   const theme: ThemeId = input.storedTheme !== null && isThemeId(input.storedTheme) ? input.storedTheme : 'paper';
@@ -159,6 +162,8 @@ export const applyPrefs = (s: State, p: UrlPrefs): State => {
 
 export type Action =
   | { type: 'url/apply'; prefs: UrlPrefs }
+  | { type: 'open/show' }
+  | { type: 'open/hide' }
   | { type: 'nav/dashboard' }
   | { type: 'nav/view'; id: string }
   | { type: 'nav/markdown'; focusId: string | null }
@@ -204,6 +209,10 @@ export const reducer = (s: State, a: Action): State => {
   switch (a.type) {
     case 'url/apply':
       return applyPrefs(s, a.prefs);
+    case 'open/show':
+      return { ...s, openDialog: true };
+    case 'open/hide':
+      return { ...s, openDialog: false };
     case 'nav/dashboard':
       return { ...s, screen: { kind: 'dashboard' } };
     case 'nav/view': {
@@ -284,11 +293,11 @@ export const reducer = (s: State, a: Action): State => {
     case 'md/load': {
       const text = a.type === 'md/load' ? a.text : s.md.text;
       const read = readLedger(text);
-      if (!read.ok) return { ...s, screen: { kind: 'markdown', focusId: null }, md: { ...s.md, text, error: read.error, notice: null } };
+      if (!read.ok) return { ...s, openDialog: false, screen: { kind: 'markdown', focusId: null }, md: { ...s.md, text, error: read.error, notice: null } };
       const normal = serializeLedger(read.adrs);
       const what = a.type === 'md/load' ? `Loaded ${a.source}` : 'Applied';
       const notice = `${what}: ${read.adrs.length} record${read.adrs.length === 1 ? '' : 's'}${normal === text ? '' : ' (tidied into the standard layout)'}.`;
-      return { ...s, adrs: read.adrs, md: { text: normal, base: normal, error: null, notice } };
+      return { ...s, openDialog: false, adrs: read.adrs, md: { text: normal, base: normal, error: null, notice } };
     }
     case 'md/discard':
       return { ...s, md: { text: s.md.base, base: s.md.base, error: null, notice: null } };

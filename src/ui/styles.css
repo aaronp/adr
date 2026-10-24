@@ -160,7 +160,9 @@ textarea.input { resize: vertical; }
 .field-role { flex: 1 1 160px; }
 .row-fields { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 .row-fields > .grow-main { flex: 999 1 220px; }
-.legend { padding: 0 6px; font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+/* A fieldset's title sits inside the card, styled like the side panels' kickers (floating it takes it out of the border notch). */
+.legend { float: left; width: 100%; padding: 0; margin: 0; font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.legend + * { clear: both; }
 .legend-n { font-size: 13px; color: var(--faint); margin-right: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--control-border); background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 500; }
@@ -340,3 +342,25 @@ textarea.input { resize: vertical; }
 .toast { padding: 12px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22); }
 .toast-ok { background: var(--chrome); color: var(--on-chrome); }
 .toast-error { background: var(--bad-bg); color: var(--bad-fg); border: 1px solid var(--bad); }
+
+/* Edit form: sections as vertical tabs beside the open section; tabs run across the top on narrow screens. */
+.vtabs-layout { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.vtabs { flex: 0 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; }
+.vtab { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; }
+.vtab:hover { border-color: var(--border-strong); }
+.vtab.on { background: var(--highlight); border-color: var(--accent); border-left-color: var(--accent); }
+.vtab-panel { flex: 999 1 420px; min-width: 0; }
+@media (max-width: 640px) {
+  .vtabs { flex: 1 1 100%; flex-direction: row; overflow-x: auto; position: static; }
+  .vtab { flex: 0 0 auto; }
+}
+/* Side-panel entries that jump to their solution or criterion in the form. */
+.side-link { min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.side-link-text { text-decoration: underline; text-decoration-color: var(--control-border); text-underline-offset: 3px; }
+.side-link:hover .side-link-text { color: var(--accent); text-decoration-color: currentColor; }
+/* Open dialog. */
+.modal { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35); }
+.modal::backdrop { background: rgba(0, 0, 0, 0.45); }
+.modal-body { padding: 24px; }
+.drop-zone { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; min-height: 140px; padding: 20px; border: 2px dashed var(--control-border); border-radius: var(--radius); color: var(--muted); text-align: center; }
+.drop-zone.on { border-color: var(--accent); background: var(--highlight); color: var(--ink); }

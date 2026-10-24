@@ -32,7 +32,6 @@ export interface MarkdownViewProps {
 export const MarkdownView = ({ md, focusId, sampleMarkdown, storage, dispatch, fx }: MarkdownViewProps) => {
   const area = useRef<HTMLTextAreaElement>(null);
   const gutter = useRef<HTMLDivElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const dirty = md.text !== md.base;
   const lineCount = md.text.split('\n').length;
@@ -85,20 +84,8 @@ export const MarkdownView = ({ md, focusId, sampleMarkdown, storage, dispatch, f
               <span class="muted small-plus measure">Every record lives in this one file. Edit it here, or open your own; download it to keep it in git alongside your code.</span>
             </div>
             <div class="row-s wrap-row">
-              <input
-                ref={fileInput}
-                type="file"
-                accept=".md,.markdown,.txt,text/markdown,text/plain"
-                class="visually-hidden"
-                aria-label="Open a markdown file"
-                onChange={(e) => {
-                  const f = e.currentTarget.files?.[0];
-                  e.currentTarget.value = '';
-                  if (f !== undefined) fx.openFile(f);
-                }}
-              />
-              <button type="button" class="btn" onClick={() => fileInput.current?.click()}>
-                <Icon name="upload" /> Open .md…
+              <button type="button" class="btn" onClick={() => dispatch({ type: 'open/show' })}>
+                <Icon name="upload" /> Open…
               </button>
               <button type="button" class="btn" onClick={() => fx.copy(md.text, 'Markdown')}>
                 <Icon name="copy" /> Copy
