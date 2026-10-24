@@ -4,7 +4,7 @@
  */
 import { Value } from '@sinclair/typebox/value';
 import { AdrSchema, ROLES, STATUSES, type Adr } from './schema.ts';
-import { daysBetween, isDate, plural } from './dates.ts';
+import { daysBetween, isDate } from './dates.ts';
 import { scoreOf } from './scoring.ts';
 
 /**
@@ -14,32 +14,23 @@ import { scoreOf } from './scoring.ts';
  */
 export const validateAdr = (adr: Adr, ledger: readonly Adr[], originalId: string | null): string[] => {
   const E: string[] = [];
-  if (!/^ADR-\d{4}$/.test(adr.id)) E.push('ID must look like ADR-0001.');
+  if (!/^\S+$/.test(adr.id)) E.push('ID must be one word, like ADR-0001.');
   else if (ledger.some((a) => a.id === adr.id && a.id !== originalId)) E.push(`${adr.id} is already used by another record.`);
   if (adr.title === '') E.push('Title is required.');
   if (!(STATUSES as readonly string[]).includes(adr.status)) E.push(`Status "${adr.status}" must be one of ${STATUSES.join(', ')}.`);
 
+  /* Only a title is required; everything else is checked when it is filled in. */
   const dateOk = isDate(adr.date);
-  if (!dateOk) E.push('Decision date must be a valid YYYY-MM-DD date.');
+  if (adr.date !== '' && !dateOk) E.push('Decision date must be a valid YYYY-MM-DD date, or empty.');
   if (adr.revisit !== null) {
     if (!isDate(adr.revisit)) E.push('Revisit date must be a valid YYYY-MM-DD date, or empty.');
     else if (dateOk && daysBetween(adr.date, adr.revisit) <= 0) E.push('Revisit date must be after the decision date.');
   }
 
-  if (adr.goal === '') E.push('Goal is required.');
-  const h = adr.hypothesis;
-  if (h.believe === '' || h.willResultIn === '' || h.measuredBy === '') {
-    E.push('Hypothesis needs all three parts: we believe, will result in, and how we will know.');
-  }
-
-  if (adr.people.length === 0) E.push('Add at least one person.');
   adr.people.forEach((p, i) => {
     if (p.name === '') E.push(`Person ${i + 1} needs a name.`);
     if (!(ROLES as readonly string[]).includes(p.role)) E.push(`Person ${i + 1} has unknown role "${p.role}".`);
   });
-  if (adr.people.length > 0 && !adr.people.some((p) => p.role === 'decider')) E.push('At least one person must be a decider.');
-
-  if (adr.criteria.length === 0) E.push('Add at least one criterion.');
   const critNames = new Set<string>();
   const critIds = new Set<string>();
   adr.criteria.forEach((c, i) => {
@@ -52,7 +43,6 @@ export const validateAdr = (adr: Adr, ledger: readonly Adr[], originalId: string
     if (!(Number.isInteger(c.weight) && c.weight >= 1 && c.weight <= 5)) E.push(`${label} needs a weight from 1 to 5.`);
   });
 
-  if (adr.solutions.length === 0) E.push('Add at least one proposed solution.');
   const solNames = new Set<string>();
   const solIds = new Set<string>();
   adr.solutions.forEach((s, i) => {
@@ -71,11 +61,6 @@ export const validateAdr = (adr: Adr, ledger: readonly Adr[], originalId: string
   });
 
   if (adr.decision !== null && !solIds.has(adr.decision)) E.push('The chosen solution does not exist.');
-  if (adr.status === 'accepted') {
-    if (adr.decision === null) E.push('An accepted ADR must name the chosen solution.');
-    const unscored = adr.solutions.reduce((n, s) => n + adr.criteria.filter((c) => scoreOf(s, c.id) === null).length, 0);
-    if (unscored > 0) E.push(`An accepted ADR must be fully scored (${plural(unscored, 'score')} missing).`);
-  }
 
   if (E.length === 0 && !Value.Check(AdrSchema, adr)) {
     const first = Value.Errors(AdrSchema, adr).First();

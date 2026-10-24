@@ -40,10 +40,11 @@ test('sample records are valid against each other', () => {
 
 test('validation catches cross-field problems', () => {
   const a = byId('ADR-0012');
-  assert.match(validateAdr({ ...a, decision: null }, [], a.id).join(), /accepted ADR must name/);
   assert.match(validateAdr({ ...a, revisit: '2026-01-01' }, [], a.id).join(), /after the decision date/);
-  assert.match(validateAdr({ ...a, people: a.people.filter((p) => p.role !== 'decider') }, [], a.id).join(), /decider/);
+  assert.match(validateAdr({ ...a, decision: 'nope' }, [], a.id).join(), /chosen solution does not exist/);
   assert.match(validateAdr(a, [byId('ADR-0012')], null).join(), /already used/);
+  // Incomplete is fine: only what is filled in is checked.
+  assert.deepEqual(validateAdr({ ...a, decision: null, people: [], criteria: [], solutions: [], goal: '' }, [], a.id), []);
 });
 
 test('draft round-trip is lossless', () => {
@@ -69,9 +70,9 @@ test('setScore is immutable', () => {
   assert.equal(d2.solutions.find((s) => s.id === 'avro')?.scores['tooling'], 2);
 });
 
-test('blank draft is invalid until filled in', () => {
-  const errs = validateAdr(fromDraft(blankDraft('ADR-0099', TODAY)), [], null);
-  assert.ok(errs.length >= 5);
+test('a blank draft needs only a title', () => {
+  assert.deepEqual(validateAdr(fromDraft(blankDraft('ADR-0099', TODAY)), [], null), ['Title is required.']);
+  assert.deepEqual(validateAdr(fromDraft({ ...blankDraft('ADR-0099', TODAY), title: 'Pick a queue' }), [], null), []);
 });
 
 test('nextAdrId', () => {

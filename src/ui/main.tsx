@@ -134,7 +134,7 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
       break;
     }
     case 'edit':
-      body = <EditForm draft={s.draft} originalId={s.originalId} triedSave={s.triedSave} open={s.open} adrs={state.adrs} dispatch={dispatch} />;
+      body = <EditForm draft={s.draft} originalId={s.originalId} triedSave={s.triedSave} open={s.open} focus={s.focus} adrs={state.adrs} dispatch={dispatch} />;
       break;
     case 'markdown':
       body = <MarkdownView md={state.md} focusId={s.focusId} sampleMarkdown={sampleMarkdown} storage={storage} dispatch={dispatch} fx={fx} />;

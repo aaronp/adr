@@ -42,7 +42,8 @@ export const DraftSchema = Type.Object(
       })
     ),
     decision: Type.String({ description: 'Chosen solution id, or "" for none.' }),
-    rationale: Type.String()
+    rationale: Type.String(),
+    notes: Type.String()
   },
   { description: 'In-progress edit of one ADR.' }
 );
@@ -71,7 +72,8 @@ export const toDraft = (adr: Adr): Draft => ({
     scores: { ...s.scores }
   })),
   decision: adr.decision ?? '',
-  rationale: adr.rationale
+  rationale: adr.rationale,
+  notes: adr.notes
 });
 
 const lines = (t: string): string[] =>
@@ -108,7 +110,8 @@ export const fromDraft = (d: Draft): Adr => ({
     scores: { ...s.scores }
   })),
   decision: d.decision === '' ? null : d.decision,
-  rationale: d.rationale.trim()
+  rationale: d.rationale.trim(),
+  notes: d.notes.trim()
 });
 
 export const blankDraft = (id: string, today: string): Draft => ({
@@ -124,7 +127,8 @@ export const blankDraft = (id: string, today: string): Draft => ({
   criteria: [],
   solutions: [],
   decision: '',
-  rationale: ''
+  rationale: '',
+  notes: ''
 });
 
 /** Next free id after the highest ADR-NNNN in the ledger. */

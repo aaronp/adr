@@ -32,6 +32,13 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
         ? { kicker: 'No decision yet · leading', name: model.leader.solution.name, color: seriesColor(model.leader.index), detail: `${scoreLabel(model.leader)} / 5 weighted · ${plural(model.rows.length, 'option')}` }
         : { kicker: 'No decision yet', name: 'Scoring incomplete', color: 'var(--border-strong)', detail: `${plural(model.rows.length, 'option')} still need scores` };
   const md = serializeAdr(adr);
+  /* Links into the edit form: each opens the tab holding that field and focuses it. */
+  const editAt = (focus: string) => () => dispatch({ type: 'edit/start', id: adr.id, focus });
+  const editIcon = (focus: string, what: string) => (
+    <button type="button" class="edit-icon" title={`Edit ${what}`} aria-label={`Edit ${what}`} onClick={editAt(focus)}>
+      <Icon name="edit" size={14} />
+    </button>
+  );
   const fileName = `${adr.id.toLowerCase()}.md`;
 
   return (
@@ -46,7 +53,7 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
               <div class="row-s wrap-row">
                 <span class="mono strong text-2">{adr.id}</span>
                 <StatusPill status={adr.status} large />
-                <span class="mono small muted">Decided {formatDate(adr.date)}</span>
+                {adr.date === '' ? null : <span class="mono small muted">Decided {formatDate(adr.date)}</span>}
                 <RevisitBadge info={rv} long />
               </div>
               <h1 class="display-l">{adr.title}</h1>
@@ -78,12 +85,17 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
 
       <div class="wrap page split">
         <div class="split-main stack-l">
-          <section aria-labelledby="goal-h" class="stack-s">
-            <Kicker as="h2" id="goal-h">
-              Goal
-            </Kicker>
-            <p class="lead">{adr.goal}</p>
-          </section>
+          {adr.goal !== '' ? (
+            <section aria-labelledby="goal-h" class="stack-s">
+              <div class="row-s">
+                <Kicker as="h2" id="goal-h">
+                  Goal
+                </Kicker>
+                {editIcon('f-goal', 'the goal')}
+              </div>
+              <p class="lead">{adr.goal}</p>
+            </section>
+          ) : null}
 
           <section aria-labelledby="cmp-h" class="card pad stack-m">
             <div class="row-between wrap-row">
@@ -101,8 +113,12 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
                 ))}
               </div>
             </div>
-            {viz === 'matrix' ? (
-              <MatrixChart model={model} decision={adr.decision} />
+            {n === 0 || model.rows.length === 0 ? (
+              <div class="empty-inline">
+                {n === 0 && model.rows.length === 0 ? 'Add criteria and solutions to compare them.' : n === 0 ? 'Add criteria to score the solutions against.' : 'Add solutions to compare against these criteria.'}
+              </div>
+            ) : viz === 'matrix' ? (
+              <MatrixChart model={model} decision={adr.decision} onEdit={(focus) => editAt(focus)()} />
             ) : viz === 'radar' ? (
               <RadarChart model={model} decision={adr.decision} hidden={hidden} dispatch={dispatch} />
             ) : viz === 'weighted' ? (
@@ -112,123 +128,149 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
             )}
           </section>
 
-          <section aria-labelledby="crit-h" class="card pad stack-m">
-            <div class="row-between wrap-row">
-              <h2 id="crit-h" class="display-m">
-                Criteria &amp; weights
-              </h2>
-              <span class="mono small muted">weights 1–5 · share of total</span>
-            </div>
-            <div>
-              {adr.criteria.map((c) => (
-                <div key={c.id} class="crit-row">
-                  <div class="grow-main stack-xxs">
-                    <span class="strong">{c.name}</span>
-                    <span class="small-plus muted">{c.description}</span>
-                  </div>
-                  <div class="row-s crit-weight">
-                    <span class="pips" role="img" aria-label={`Weight ${c.weight} of 5`}>
-                      {[1, 2, 3, 4, 5].map((k) => (
-                        <span key={k} class={k <= c.weight ? 'pip on' : 'pip'} />
-                      ))}
-                    </span>
-                    <span class="mono strong share">{model.totalWeight > 0 ? Math.round((c.weight / model.totalWeight) * 100) : 0}%</span>
-                  </div>
+          {n > 0 ? (
+            <section aria-labelledby="crit-h" class="card pad stack-m">
+              <div class="row-between wrap-row">
+                <div class="row-s">
+                  <h2 id="crit-h" class="display-m">
+                    Criteria &amp; weights
+                  </h2>
+                  {editIcon(`cn-${adr.criteria[0]?.id ?? ''}`, 'the criteria')}
                 </div>
-              ))}
-            </div>
-          </section>
-
-          <section aria-labelledby="sol-h" class="card pad stack-s">
-            <div class="row-between wrap-row">
-              <h2 id="sol-h" class="display-m">
-                Proposed solutions
-              </h2>
-              <div class="row-xs">
-                <button type="button" class="link-btn" onClick={() => dispatch({ type: 'view/setAll', open: true })}>
-                  Expand all
-                </button>
-                <button type="button" class="link-btn" onClick={() => dispatch({ type: 'view/setAll', open: false })}>
-                  Collapse all
-                </button>
+                <span class="mono small muted">weights 1–5 · share of total</span>
               </div>
-            </div>
-            <div>
-              {model.rows.map((r) => {
-                const s = r.solution;
-                const open = expanded[s.id] === true;
-                const isChosen = adr.decision === s.id;
-                const isLeader = model.leader !== null && model.leader.solution.id === s.id;
-                return (
-                  <div key={s.id} class="acc">
-                    <button type="button" class="acc-head" aria-expanded={open} onClick={() => dispatch({ type: 'view/toggle', solutionId: s.id })}>
-                      <span class="mono small muted acc-rank">#{r.rank}</span>
-                      <Swatch color={seriesColor(r.index)} size={12} />
-                      <span class="grow-main row-s wrap-row">
-                        <span class="acc-title">{s.name}</span>
-                        {isChosen ? <span class="flag flag-solid">Chosen</span> : null}
-                        {isLeader && !isChosen ? <span class="flag">Highest score</span> : null}
+              <div>
+                {adr.criteria.map((c) => (
+                  <div key={c.id} class="crit-row">
+                    <div class="grow-main stack-xxs">
+                      <button type="button" class="side-link strong" title={`Edit ${c.name}`} onClick={editAt(`cn-${c.id}`)}>
+                        <span class="side-link-text">{c.name}</span>
+                      </button>
+                      <span class="small-plus muted">{c.description}</span>
+                    </div>
+                    <div class="row-s crit-weight">
+                      <span class="pips" role="img" aria-label={`Weight ${c.weight} of 5`}>
+                        {[1, 2, 3, 4, 5].map((k) => (
+                          <span key={k} class={k <= c.weight ? 'pip on' : 'pip'} />
+                        ))}
                       </span>
-                      <span class="acc-score">
-                        <span class="mono strong">{scoreLabel(r)}</span>
-                        <span class="meter meter-s">
-                          <span style={{ width: `${r.pct}%`, background: seriesColor(r.index) }} />
-                        </span>
-                      </span>
-                      <Icon name={open ? 'up' : 'down'} size={20} />
-                    </button>
-                    {open ? (
-                      <div class="acc-body stack-m">
-                        {s.summary !== '' ? <p class="text-2 measure">{s.summary}</p> : null}
-                        <div class="bordered">
-                          {adr.criteria.map((c) => {
-                            const v = scoreOf(s, c.id);
-                            return (
-                              <div key={c.id} class="score-row">
-                                <span class="grow-main small-plus">{c.name}</span>
-                                <Dots value={v} color={seriesColor(r.index)} size={12} />
-                                <span class="mono small muted score-calc">{v === null ? 'unscored' : `${v} × ${c.weight} = ${v * c.weight}`}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div class="two-col">
-                          <div class="stack-xs">
-                            <span class="kicker good">Pros</span>
-                            {s.pros.length === 0 ? <span class="small muted">None recorded.</span> : null}
-                            {s.pros.map((t) => (
-                              <span key={t} class="bullet good">
-                                <Icon name="plus" />
-                                <span class="ink">{t}</span>
-                              </span>
-                            ))}
-                          </div>
-                          <div class="stack-xs">
-                            <span class="kicker bad">Cons</span>
-                            {s.cons.length === 0 ? <span class="small muted">None recorded.</span> : null}
-                            {s.cons.map((t) => (
-                              <span key={t} class="bullet bad">
-                                <Icon name="minus" />
-                                <span class="ink">{t}</span>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
+                      <span class="mono strong share">{model.totalWeight > 0 ? Math.round((c.weight / model.totalWeight) * 100) : 0}%</span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {model.rows.length > 0 ? (
+            <section aria-labelledby="sol-h" class="card pad stack-s">
+              <div class="row-between wrap-row">
+                <h2 id="sol-h" class="display-m">
+                  Proposed solutions
+                </h2>
+                <div class="row-xs">
+                  <button type="button" class="link-btn" onClick={() => dispatch({ type: 'view/setAll', open: true })}>
+                    Expand all
+                  </button>
+                  <button type="button" class="link-btn" onClick={() => dispatch({ type: 'view/setAll', open: false })}>
+                    Collapse all
+                  </button>
+                </div>
+              </div>
+              <div>
+                {model.rows.map((r) => {
+                  const s = r.solution;
+                  const open = expanded[s.id] === true;
+                  const isChosen = adr.decision === s.id;
+                  const isLeader = model.leader !== null && model.leader.solution.id === s.id;
+                  return (
+                    <div key={s.id} class="acc">
+                      <div class="acc-row">
+                        <button type="button" class="acc-head" aria-expanded={open} onClick={() => dispatch({ type: 'view/toggle', solutionId: s.id })}>
+                          <span class="mono small muted acc-rank">#{r.rank}</span>
+                          <Swatch color={seriesColor(r.index)} size={12} />
+                          <span class="grow-main row-s wrap-row">
+                            <span class="acc-title">{s.name}</span>
+                            {isChosen ? <span class="flag flag-solid">Chosen</span> : null}
+                            {isLeader && !isChosen ? <span class="flag">Highest score</span> : null}
+                          </span>
+                          <span class="acc-score">
+                            <span class="mono strong">{scoreLabel(r)}</span>
+                            <span class="meter meter-s">
+                              <span style={{ width: `${r.pct}%`, background: seriesColor(r.index) }} />
+                            </span>
+                          </span>
+                          <Icon name={open ? 'up' : 'down'} size={20} />
+                        </button>
+                        {editIcon(`sn-${s.id}`, s.name)}
+                      </div>
+                      {open ? (
+                        <div class="acc-body stack-m">
+                          {s.summary !== '' ? <p class="text-2 measure">{s.summary}</p> : null}
+                          <div class="bordered">
+                            {adr.criteria.map((c) => {
+                              const v = scoreOf(s, c.id);
+                              return (
+                                <div key={c.id} class="score-row">
+                                  <span class="grow-main small-plus">{c.name}</span>
+                                  <Dots value={v} color={seriesColor(r.index)} size={12} />
+                                  <span class="mono small muted score-calc">{v === null ? 'unscored' : `${v} × ${c.weight} = ${v * c.weight}`}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div class="two-col">
+                            <div class="stack-xs">
+                              <span class="kicker good">Pros</span>
+                              {s.pros.length === 0 ? <span class="small muted">None recorded.</span> : null}
+                              {s.pros.map((t) => (
+                                <span key={t} class="bullet good">
+                                  <Icon name="plus" />
+                                  <span class="ink">{t}</span>
+                                </span>
+                              ))}
+                            </div>
+                            <div class="stack-xs">
+                              <span class="kicker bad">Cons</span>
+                              {s.cons.length === 0 ? <span class="small muted">None recorded.</span> : null}
+                              {s.cons.map((t) => (
+                                <span key={t} class="bullet bad">
+                                  <Icon name="minus" />
+                                  <span class="ink">{t}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
 
           <section aria-labelledby="dec-h" class="card pad stack-s">
-            <h2 id="dec-h" class="display-m">
-              Decision &amp; rationale
-            </h2>
+            <div class="row-s">
+              <h2 id="dec-h" class="display-m">
+                Decision &amp; rationale
+              </h2>
+              {editIcon('f-rationale', 'the decision')}
+            </div>
             <span class="strong">{chosen !== null ? `Chosen: ${chosen.solution.name}` : 'No solution chosen yet.'}</span>
             <p class="text-2 measure pre-line">{adr.rationale === '' ? 'No rationale recorded yet.' : adr.rationale}</p>
           </section>
+          {adr.notes === '' ? null : (
+            <section aria-labelledby="notes-h" class="card pad stack-s">
+              <div class="row-between">
+                <Kicker as="h2" id="notes-h">
+                  Notes
+                </Kicker>
+                {editIcon('f-notes', 'the notes')}
+              </div>
+              <p class="text-2 measure pre-line">{adr.notes}</p>
+            </section>
+          )}
         </div>
 
         <aside class="split-side stack-m">
@@ -241,44 +283,54 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
             <span class="mono small on-chrome-muted">{outcome.detail}</span>
           </section>
 
-          <section aria-labelledby="hyp-h" class="card pad stack-s">
-            <Kicker as="h2" id="hyp-h">
-              Goal hypothesis
-            </Kicker>
-            <div class="hyp">
-              <span class="hyp-label">We believe</span>
-              <span class="text-2">{adr.hypothesis.believe}</span>
-            </div>
-            <div class="hyp">
-              <span class="hyp-label">will result in</span>
-              <span class="text-2">{adr.hypothesis.willResultIn}</span>
-            </div>
-            <div class="hyp">
-              <span class="hyp-label">We’ll know we’re right when</span>
-              <span class="text-2">{adr.hypothesis.measuredBy}</span>
-            </div>
-          </section>
+          {(adr.hypothesis.believe + adr.hypothesis.willResultIn + adr.hypothesis.measuredBy).trim() !== '' ? (
+            <section aria-labelledby="hyp-h" class="card pad stack-s">
+              <div class="row-between">
+                <Kicker as="h2" id="hyp-h">
+                  Goal hypothesis
+                </Kicker>
+                {editIcon('f-h-believe', 'the hypothesis')}
+              </div>
+              <div class="hyp">
+                <span class="hyp-label">We believe</span>
+                <span class="text-2">{adr.hypothesis.believe}</span>
+              </div>
+              <div class="hyp">
+                <span class="hyp-label">will result in</span>
+                <span class="text-2">{adr.hypothesis.willResultIn}</span>
+              </div>
+              <div class="hyp">
+                <span class="hyp-label">We’ll know we’re right when</span>
+                <span class="text-2">{adr.hypothesis.measuredBy}</span>
+              </div>
+            </section>
+          ) : null}
 
-          <section aria-labelledby="ppl-h" class="card pad stack-m">
-            <Kicker as="h2" id="ppl-h">
-              People
-            </Kicker>
-            {ROLES.map((role) => {
-              const people = adr.people.filter((p) => p.role === role);
-              if (people.length === 0) return null;
-              return (
-                <div key={role} class="stack-xs">
-                  <span class="small strong text-2">{ROLE_GROUP[role]}</span>
-                  {people.map((p) => (
-                    <span key={p.name} class="row-s">
-                      <Avatar person={p} />
-                      {p.name}
-                    </span>
-                  ))}
-                </div>
-              );
-            })}
-          </section>
+          {adr.people.length > 0 ? (
+            <section aria-labelledby="ppl-h" class="card pad stack-m">
+              <div class="row-between">
+                <Kicker as="h2" id="ppl-h">
+                  People
+                </Kicker>
+                {editIcon('pn-person-0', 'people')}
+              </div>
+              {ROLES.map((role) => {
+                const people = adr.people.filter((p) => p.role === role);
+                if (people.length === 0) return null;
+                return (
+                  <div key={role} class="stack-xs">
+                    <span class="small strong text-2">{ROLE_GROUP[role]}</span>
+                    {people.map((p) => (
+                      <button key={p.name} type="button" class="side-link row-s" title={`Edit ${p.name}`} onClick={editAt(`pn-person-${adr.people.indexOf(p)}`)}>
+                        <Avatar person={p} />
+                        <span class="side-link-text">{p.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </section>
+          ) : null}
 
           <section aria-labelledby="tl-h" class="card pad stack-s">
             <Kicker as="h2" id="tl-h">
@@ -286,7 +338,7 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
             </Kicker>
             <div class="row-between">
               <span class="muted">Decided</span>
-              <span class="mono">{formatDate(adr.date)}</span>
+              <span class="mono">{adr.date === '' ? 'Undated' : formatDate(adr.date)}</span>
             </div>
             <div class="row-between">
               <span class="muted">Revisit</span>

@@ -57,7 +57,7 @@ const expectLineError = (text: string, line: number, fragment: string): void => 
   );
 };
 
-test('errors carry line numbers', () => {
+test('only what cannot be read is an error, with its line number', () => {
   const sample = readSample();
   const lines = sample.split('\n');
   const at = (needle: string): number => {
@@ -65,29 +65,86 @@ test('errors carry line numbers', () => {
     if (i < 0) throw new Error(`test setup: no line starting "${needle}"`);
     return i + 1;
   };
-  const closingFrontmatter = 9;
 
   expectLineError('# Title\n', 1, 'expected "---"');
-  expectLineError(sample.replace('status: accepted', 'status: maybe'), closingFrontmatter, 'status "maybe"');
   expectLineError(sample.replace('| ops | Operational burden | 5 |', '| ops | Operational burden | 9 |'), at('| ops | Operational burden | 5 |'), 'weight "9"');
-  expectLineError(sample.replace('- Priya Shah — decider', '- Priya Shah — boss'), at('- Priya Shah — decider'), 'people lines');
-  expectLineError(sample.replace('## Goal', '## Goals'), at('## Goal'), 'unknown section');
-  expectLineError(sample.replace('decision: kafka', 'decision: pulsar'), closingFrontmatter, 'decision "pulsar"');
-  expectLineError(sample.replace('revisit: 2027-03-14', 'revisit: 2027-02-30'), closingFrontmatter, 'revisit');
+  expectLineError(sample.replace('| ops | 3 |', '| ops | high |'), at('| ops | 3 |'), 'score "high"');
+  expectLineError(sample.replace('revisit: 2027-03-14', 'revisit: 2027-02-30'), at('revisit: 2027-03-14'), 'revisit');
+  expectLineError(sample.replace('title: Choose an event streaming platform\n', ''), 1, 'no "title:"');
 });
 
-test('missing frontmatter key is an error, not a default', () => {
-  const broken = readSample().replace('tags: data, infrastructure\n', '');
-  assert.throws(() => parseLedger(broken), /missing "tags:"/);
+test('loose input is read with defaults, and nothing is lost', () => {
+  const adr = parseLedger(`---
+Title: Pick a queue
+Status: Draft
+tags: [infra, , data]
+---
+We need one queue for jobs.
+
+## Context
+Two teams run their own today.
+
+## People
+- Ana; Bo — proposed consultees; unassigned
+- Cy - Decider
+- Di
+
+## Criteria
+| Criterion | Weight |
+| Cost | 4 |
+| Ops | |
+
+Gates: must run in our region.
+
+## Option: Managed SQS
+Cheap.
+
+| criterion | score |
+| cost | 4 |
+
+**Pros:**
+* no servers
+
+## Decision
+Undecided.
+`)[0];
+  if (adr === undefined) throw new Error('no record');
+  assert.equal(adr.id, 'ADR-0001');
+  assert.equal(adr.status, 'proposed');
+  assert.equal(adr.date, '');
+  assert.deepEqual(adr.tags, ['infra', 'data']);
+  assert.equal(adr.goal, 'We need one queue for jobs.');
+  assert.deepEqual(
+    adr.people.map((p) => `${p.name}/${p.role}`),
+    ['Ana (proposed, unassigned)/consulted', 'Bo (proposed, unassigned)/consulted', 'Cy/decider', 'Di/consulted']
+  );
+  assert.deepEqual(
+    adr.criteria.map((c) => `${c.id}:${c.weight}`),
+    ['cost:4', 'ops:1']
+  );
+  const [sol] = adr.solutions;
+  assert.ok(sol !== undefined && sol.id === 'managed-sqs' && sol.name === 'Managed SQS' && sol.summary === 'Cheap.');
+  assert.deepEqual(sol.scores, { cost: 4, ops: null });
+  assert.deepEqual(sol.pros, ['no servers']);
+  assert.match(adr.notes, /Gates: must run in our region\./);
+  assert.match(adr.notes, /\*\*Context\*\*\nTwo teams run their own today\./);
+  assert.deepEqual(validateLedger([adr]), []);
+  // Saving writes the normal form, which reads back the same.
+  assert.deepEqual(parseLedger(serializeLedger([adr])), [adr]);
 });
 
-test('missing score row is an error', () => {
-  const broken = readSample().replace('| ops | 3 |\n', '');
-  assert.throws(() => parseLedger(broken), /no score row for criterion "ops"/);
+test('the smallest record is just a title', () => {
+  const [adr] = parseLedger('---\ntitle: Use Postgres\n---\n');
+  assert.ok(adr !== undefined && adr.title === 'Use Postgres' && adr.id === 'ADR-0001' && adr.criteria.length === 0);
+  assert.deepEqual(validateLedger([adr]), []);
 });
 
-test('duplicate record ids are rejected', () => {
+test('a missing score row is unscored, and a repeated record id gets the next free one', () => {
+  assert.equal(parseLedger(readSample().replace('| ops | 3 |\n', ''))[0]?.solutions[0]?.scores['ops'], null);
   const s = readSample();
   const firstRecord = s.slice(0, s.indexOf('\n---\nid: ADR-0013') + 1);
-  assert.throws(() => parseLedger(firstRecord + firstRecord), /duplicate record id ADR-0012/);
+  assert.deepEqual(
+    parseLedger(firstRecord + firstRecord).map((a) => a.id),
+    ['ADR-0012', 'ADR-0013']
+  );
 });

@@ -10,6 +10,14 @@ import { rampColor, seriesColor } from '../themes.ts';
 import { Avatar, Icon, Kicker, Swatch, statusLabel, type Dispatch } from './common.tsx';
 
 type TabId = 'basics' | 'criteria' | 'people' | 'solutions' | 'decision';
+/** The tab that holds a form field, from its id prefix. */
+const tabOf = (fieldId: string | null): TabId =>
+  fieldId === null ? 'basics'
+  : fieldId.startsWith('cn-') || fieldId.startsWith('cd-') ? 'criteria'
+  : fieldId.startsWith('pn-') || fieldId.startsWith('pr-') ? 'people'
+  : /^(sn|ss|sp|sc)-/.test(fieldId) ? 'solutions'
+  : fieldId === 'f-rationale' || fieldId === 'f-notes' || fieldId === 'f-decision' ? 'decision'
+  : 'basics';
 
 const ROLE_LABEL: Record<Role, string> = { decider: 'Decider', author: 'Author', consulted: 'Consulted', informed: 'Informed' };
 
@@ -18,6 +26,8 @@ export interface EditFormProps {
   readonly originalId: string | null;
   readonly triedSave: boolean;
   readonly open: Readonly<Record<string, boolean>>;
+  /** Field id to open on (its tab) and focus when the form first shows, or null. */
+  readonly focus: string | null;
   readonly adrs: readonly Adr[];
   readonly dispatch: Dispatch;
 }
@@ -32,15 +42,112 @@ const Scale = ({ value, onPick, label }: { value: number | null; onPick: (n: num
   </span>
 );
 
-export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch }: EditFormProps) => {
+/**
+ * A list of one-line items kept as newline-separated text (pros, cons): a box that adds a line on Enter, and the
+ * lines below it, each deletable and editable in place (click it; Enter or leaving saves, Esc cancels, empty deletes).
+ */
+const LineList = ({ id, label, tone, placeholder, value, onChange }: { id: string; label: string; tone: 'good' | 'bad'; placeholder: string; value: string; onChange: (v: string) => void }) => {
+  const items = value
+    .split('\n')
+    .map((t) => t.trim())
+    .filter((t) => t !== '');
+  const [draft, setDraft] = useState('');
+  const [editing, setEditing] = useState<{ index: number; text: string } | null>(null);
+  const save = (next: readonly string[]) => onChange(next.join('\n'));
+  const add = () => {
+    const t = draft.trim();
+    if (t !== '') save([...items, t]);
+    setDraft('');
+  };
+  const commit = () => {
+    if (editing === null) return;
+    const t = editing.text.trim();
+    save(t === '' ? items.filter((_, i) => i !== editing.index) : items.map((x, i) => (i === editing.index ? t : x)));
+    setEditing(null);
+  };
+  return (
+    <div class="field">
+      <label for={id} class={tone}>
+        {label} <span class="normal muted">(Enter to add)</span>
+      </label>
+      <input
+        id={id}
+        class="input"
+        value={draft}
+        placeholder={placeholder}
+        onInput={(e) => setDraft(e.currentTarget.value)}
+        onBlur={add}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+          }
+        }}
+      />
+      {items.length === 0 ? null : (
+        <ul class={`line-list line-list-${tone}`} aria-label={label}>
+          {items.map((t, i) =>
+            editing !== null && editing.index === i ? (
+              <li key={`edit-${i}`} class="line-item editing">
+                <input
+                  class="input line-edit"
+                  aria-label={`Edit ${label.toLowerCase()} ${i + 1}`}
+                  value={editing.text}
+                  ref={(el) => el?.focus()}
+                  onInput={(e) => setEditing({ index: i, text: e.currentTarget.value })}
+                  onBlur={commit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commit();
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setEditing(null);
+                    }
+                  }}
+                />
+              </li>
+            ) : (
+              <li key={`${i}-${t}`} class="line-item">
+                <button type="button" class="line-text" title="Click to edit" onClick={() => setEditing({ index: i, text: t })}>
+                  {t}
+                </button>
+                <button type="button" class="tag-x" aria-label={`Remove “${t}”`} onClick={() => save(items.filter((_, j) => j !== i))}>
+                  <Icon name="x" size={14} />
+                </button>
+              </li>
+            )
+          )}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, dispatch }: EditFormProps) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const update = (fn: (d: Draft) => Draft) => dispatch({ type: 'edit/update', update: fn });
   const errors = triedSave ? validateAdr(fromDraft(d), adrs, originalId) : [];
   const model = scoreModel(d);
   const isNew = originalId === null;
   const save = () => dispatch({ type: 'edit/save' });
+  /* Tags: the draft keeps them as comma-separated text; here they are pills, added from the box with Enter or ",". */
+  const tags = d.tagsText
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t !== '');
+  const [tagDraft, setTagDraft] = useState('');
+  const setTags = (next: readonly string[]) => update((x) => ({ ...x, tagsText: next.join(', ') }));
+  const addTag = () => {
+    const fresh = tagDraft
+      .split(',')
+      .map((t) => t.trim().replace(/^#/, ''))
+      .filter((t) => t !== '' && !tags.some((x) => x.toLowerCase() === t.toLowerCase()));
+    if (fresh.length > 0) setTags([...tags, ...new Set(fresh)]);
+    setTagDraft('');
+  };
   /* Sections as vertical tabs; which one is open is view-only, so it lives here rather than in the reducer. */
-  const [tab, setTab] = useState<TabId>('basics');
+  const [tab, setTab] = useState<TabId>(tabOf(focus));
   const decided = model.rows.find((r) => r.solution.id === d.decision);
   const tabs: readonly { id: TabId; label: string; note: string }[] = [
     { id: 'basics', label: 'Basics', note: '' },
@@ -50,7 +157,7 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch
     { id: 'decision', label: 'Decision', note: d.decision === '' ? 'open' : decided === undefined ? '' : '✓' }
   ];
   /* The side panels jump to a solution or criterion: open its tab (and the solution's card), then focus its name field once drawn. */
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(focus);
   useEffect(() => {
     if (focusId === null) return;
     const el = document.getElementById(focusId);
@@ -178,9 +285,36 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch
                   </div>
                   <div class="field">
                     <label for="f-tags">
-                      Tags <span class="normal muted">(comma separated)</span>
+                      Tags <span class="normal muted">(Enter to add)</span>
                     </label>
-                    <input id="f-tags" class="input mono" value={d.tagsText} placeholder="data, infrastructure" onInput={(e) => update((x) => ({ ...x, tagsText: e.currentTarget.value }))} />
+                    <input
+                      id="f-tags"
+                      class="input mono"
+                      value={tagDraft}
+                      placeholder={tags.length === 0 ? 'data, infrastructure' : 'Add a tag'}
+                      onInput={(e) => setTagDraft(e.currentTarget.value)}
+                      onBlur={addTag}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault();
+                          addTag();
+                        } else if (e.key === 'Backspace' && tagDraft === '' && tags.length > 0) {
+                          setTags(tags.slice(0, -1));
+                        }
+                      }}
+                    />
+                    {tags.length === 0 ? null : (
+                      <div class="tags tags-edit" aria-label="Tags">
+                        {tags.map((t) => (
+                          <span key={t} class="tag tag-outline tag-pill">
+                            #{t}
+                            <button type="button" class="tag-x" aria-label={`Remove tag ${t}`} onClick={() => setTags(tags.filter((x) => x !== t))}>
+                              <Icon name="x" size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </fieldset>
               ) : null}
@@ -375,18 +509,8 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch
                               })}
                             </div>
                             <div class="two-col">
-                              <div class="field">
-                                <label for={`sp-${s.id}`} class="good">
-                                  Pros <span class="normal muted">(one per line)</span>
-                                </label>
-                                <textarea id={`sp-${s.id}`} class="input" rows={3} value={s.prosText} onInput={(e) => setField('prosText', e.currentTarget.value)} />
-                              </div>
-                              <div class="field">
-                                <label for={`sc-${s.id}`} class="bad">
-                                  Cons <span class="normal muted">(one per line)</span>
-                                </label>
-                                <textarea id={`sc-${s.id}`} class="input" rows={3} value={s.consText} onInput={(e) => setField('consText', e.currentTarget.value)} />
-                              </div>
+                              <LineList id={`sp-${s.id}`} label="Pros" tone="good" placeholder="Add a pro" value={s.prosText} onChange={(v) => setField('prosText', v)} />
+                              <LineList id={`sc-${s.id}`} label="Cons" tone="bad" placeholder="Add a con" value={s.consText} onChange={(v) => setField('consText', v)} />
                             </div>
                           </div>
                         ) : null}
@@ -415,6 +539,12 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, adrs, dispatch
                   <div class="field">
                     <label for="f-rationale">Rationale &amp; consequences</label>
                     <textarea id="f-rationale" class="input" rows={4} value={d.rationale} onInput={(e) => update((x) => ({ ...x, rationale: e.currentTarget.value }))} />
+                  </div>
+                  <div class="field">
+                    <label for="f-notes">
+                      Notes <span class="normal muted">(anything else worth keeping)</span>
+                    </label>
+                    <textarea id="f-notes" class="input" rows={3} value={d.notes} onInput={(e) => update((x) => ({ ...x, notes: e.currentTarget.value }))} />
                   </div>
                 </fieldset>
               ) : null}

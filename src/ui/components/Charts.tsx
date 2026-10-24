@@ -17,7 +17,16 @@ interface ChartProps {
 const tagFor = (r: Row, model: Model, decision: string | null): string =>
   decision === r.solution.id ? 'Chosen' : model.leader !== null && model.leader.solution.id === r.solution.id ? 'Highest score' : `Option ${r.index + 1}`;
 
-export const MatrixChart = ({ model, decision }: ChartProps) => {
+/** onEdit, when given, turns criterion and solution names into links to that field in the edit form. */
+export const MatrixChart = ({ model, decision, onEdit }: ChartProps & { onEdit?: (focus: string) => void }) => {
+  const name = (text: string, focus: string) =>
+    onEdit === undefined ? (
+      text
+    ) : (
+      <button type="button" class="side-link" title={`Edit ${text}`} onClick={() => onEdit(focus)}>
+        <span class="side-link-text">{text}</span>
+      </button>
+    );
   const cols = `minmax(180px, 1.6fr) 72px repeat(${model.rows.length}, minmax(120px, 1fr))`;
   const colClass = (r: Row) => (decision === r.solution.id ? 'mx-cell chosen' : 'mx-cell');
   return (
@@ -30,7 +39,7 @@ export const MatrixChart = ({ model, decision }: ChartProps) => {
             <div key={r.solution.id} class={colClass(r)}>
               <span class="row-s strong small-plus">
                 <Swatch color={seriesColor(r.index)} />
-                {r.solution.name}
+                {name(r.solution.name, `sn-${r.solution.id}`)}
               </span>
               <span class="mono tiny muted">{tagFor(r, model, decision)}</span>
             </div>
@@ -38,7 +47,7 @@ export const MatrixChart = ({ model, decision }: ChartProps) => {
         </div>
         {model.criteria.map((c) => (
           <div key={c.id} class="mx-row" style={{ gridTemplateColumns: cols }}>
-            <div class="mx-cell small-plus medium">{c.name}</div>
+            <div class="mx-cell small-plus medium">{name(c.name, `cn-${c.id}`)}</div>
             <div class="mx-cell mono strong center">×{c.weight}</div>
             {model.rows.map((r) => {
               const v = scoreOf(r.solution, c.id);

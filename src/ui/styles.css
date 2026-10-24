@@ -364,3 +364,26 @@ textarea.input { resize: vertical; }
 .modal-body { padding: 24px; }
 .drop-zone { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; min-height: 140px; padding: 20px; border: 2px dashed var(--control-border); border-radius: var(--radius); color: var(--muted); text-align: center; }
 .drop-zone.on { border-color: var(--accent); background: var(--highlight); color: var(--ink); }
+/* Editable tag pills under the tags box. */
+.tags-edit { margin-top: 8px; }
+.tag-pill { display: inline-flex; align-items: center; gap: 4px; padding-right: 2px; }
+.tag-x { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 3px; background: none; color: var(--muted); cursor: pointer; }
+.tag-x:hover { background: var(--muted-bg); color: var(--ink); }
+/* Pros/cons: one-line items under their box, each editable on click and deletable. */
+.line-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.line-item { display: flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 2px 0 10px; border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 6px; background: var(--surface); }
+.line-list-good .line-item { border-left-color: var(--good); }
+.line-list-bad .line-item { border-left-color: var(--bad); }
+.line-item.editing { padding: 2px; }
+.line-text { flex: 1 1 auto; min-width: 0; padding: 6px 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 14px; text-align: left; cursor: text; overflow-wrap: anywhere; }
+.line-text:hover { color: var(--accent); }
+.line-edit { flex: 1 1 auto; min-height: 34px; }
+/* Pencil links on the record page that open a section in the edit form. */
+.edit-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--faint); cursor: pointer; }
+.edit-icon:hover { border-color: var(--control-border); color: var(--accent); }
+/* A solution's pencil sits beside its header and shows on hover or keyboard focus (always on touch screens). */
+.acc-row { display: flex; align-items: center; gap: 4px; }
+.acc-row .acc-head { flex: 1 1 auto; min-width: 0; }
+.acc-row .edit-icon { opacity: 0; transition: opacity 120ms; }
+.acc:hover .acc-row .edit-icon, .acc-row .edit-icon:focus-visible { opacity: 1; }
+@media (hover: none) { .acc-row .edit-icon { opacity: 1; } }

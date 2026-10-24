@@ -1,9 +1,9 @@
 /**
  * The data model for an architecture decision record (ADR).
  *
- * The markdown file is the source of truth; these schemas describe what a parsed record must look
- * like. Every field is required — "not applicable" is expressed explicitly (null, empty string or
- * empty array), never by leaving a field out, so there are no hidden defaults anywhere.
+ * The markdown file is the source of truth; these schemas describe what a parsed record looks like.
+ * The file may leave almost anything out (see spec.md); the parser fills in explicit empty values
+ * (null, empty string or empty array), so every field is always present here.
  */
 import { Type, type Static } from '@sinclair/typebox';
 
@@ -101,16 +101,16 @@ export type Solution = Static<typeof SolutionSchema>;
 
 export const AdrSchema = Type.Object(
   {
-    id: Type.String({ pattern: '^ADR-\\d{4}$', description: 'Unique record id within the file.', examples: ['ADR-0012'] }),
+    id: Type.String({ pattern: '^\\S+$', description: 'Unique record id within the file; ADR-NNNN by convention, and assigned when missing.', examples: ['ADR-0012'] }),
     title: Type.String({ minLength: 1, description: 'The decision, phrased as what is being chosen.', examples: ['Choose an event streaming platform'] }),
     status: StatusSchema,
-    date: Type.String({ pattern: ISO_DATE, description: 'When the decision was made (or proposed). YYYY-MM-DD.', examples: ['2026-09-14'] }),
+    date: Type.String({ pattern: '^(\\d{4}-\\d{2}-\\d{2})?$', description: 'When the decision was made (or proposed). YYYY-MM-DD, or "" when undated.', examples: ['2026-09-14', ''] }),
     revisit: Type.Union([Type.String({ pattern: ISO_DATE }), Type.Null()], {
       description: 'Optional date to check the hypothesis and re-open the decision. null when no revisit is planned. Must be after "date".',
       examples: ['2027-03-14', null]
     }),
     tags: Type.Array(Type.String({ minLength: 1 }), { description: 'Free-form labels for search and grouping.', examples: [['data', 'infrastructure']] }),
-    goal: Type.String({ minLength: 1, description: 'What the decision must achieve — the problem, not the solution.' }),
+    goal: Type.String({ description: 'What the decision must achieve — the problem, not the solution. May be empty.' }),
     hypothesis: HypothesisSchema,
     people: Type.Array(PersonSchema, { description: 'Everyone involved; at least one decider.' }),
     criteria: Type.Array(CriterionSchema, { description: 'What the options are judged on, with weights.' }),
@@ -119,7 +119,8 @@ export const AdrSchema = Type.Object(
       description: 'Id of the chosen solution, or null while undecided / when rejected. Required when status is "accepted".',
       examples: ['kafka', null]
     }),
-    rationale: Type.String({ description: 'Why this outcome, and its consequences. May be empty while proposed.' })
+    rationale: Type.String({ description: 'Why this outcome, and its consequences. May be empty while proposed.' }),
+    notes: Type.String({ description: 'Any other text from the file that has no field of its own (notes under the criteria, extra sections), kept so saving never loses it. May be empty.' })
   },
   { additionalProperties: false, description: 'One architecture decision record.' }
 );

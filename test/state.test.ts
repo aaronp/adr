@@ -44,7 +44,7 @@ test('editing via the form updates the markdown', () => {
 });
 
 test('invalid save is refused and flagged', () => {
-  const s = run(fresh(), { type: 'edit/start', id: 'ADR-0012' }, { type: 'edit/update', update: (d) => ({ ...d, decision: '' }) }, { type: 'edit/save' });
+  const s = run(fresh(), { type: 'edit/start', id: 'ADR-0012' }, { type: 'edit/update', update: (d) => ({ ...d, decision: '', revisit: '2000-01-01' }) }, { type: 'edit/save' });
   assert.equal(s.screen.kind, 'edit');
   assert.ok(s.screen.kind === 'edit' && s.screen.triedSave);
   assert.equal(s.adrs.find((a) => a.id === 'ADR-0012')?.decision, 'kafka');
@@ -70,7 +70,7 @@ test('markdown apply replaces records; a bad edit changes nothing', () => {
   assert.equal(ok.adrs.find((a) => a.id === 'ADR-0006')?.title, 'Keep web sessions in Redis');
   assert.equal(ok.md.error, null);
 
-  const bad = run(ok, { type: 'md/text', value: ok.md.text.replace('weight | description |', 'weight |') }, { type: 'md/apply' });
+  const bad = run(ok, { type: 'md/text', value: ok.md.text.replace('date: 2026-09-14', 'date: someday') }, { type: 'md/apply' });
   assert.deepEqual(bad.adrs, ok.adrs);
   assert.notEqual(bad.md.error, null);
   const back = run(bad, { type: 'md/discard' });
@@ -113,4 +113,13 @@ test('the Open dialog shows, hides, and closes once a file loads (or fails to pa
   const bad = run(shown, { type: 'md/load', text: 'nope', source: 'x.md' });
   assert.equal(bad.openDialog, false);
   assert.equal(bad.screen.kind, 'markdown');
+});
+
+test('editing from a link opens on that field, with a linked solution expanded', () => {
+  const s = run(fresh(), { type: 'edit/start', id: 'ADR-0012', focus: 'sn-nats' });
+  assert.ok(s.screen.kind === 'edit');
+  assert.equal(s.screen.focus, 'sn-nats');
+  assert.deepEqual(s.screen.open, { nats: true });
+  const plain = run(fresh(), { type: 'edit/start', id: 'ADR-0012' });
+  assert.ok(plain.screen.kind === 'edit' && plain.screen.focus === null);
 });

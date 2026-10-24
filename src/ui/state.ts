@@ -21,7 +21,15 @@ export type VizId = (typeof VIZ)[number]['id'];
 export type Screen =
   | { readonly kind: 'dashboard' }
   | { readonly kind: 'view'; readonly id: string }
-  | { readonly kind: 'edit'; readonly draft: Draft; readonly originalId: string | null; readonly triedSave: boolean; readonly open: Readonly<Record<string, boolean>> }
+  | {
+      readonly kind: 'edit';
+      readonly draft: Draft;
+      readonly originalId: string | null;
+      readonly triedSave: boolean;
+      readonly open: Readonly<Record<string, boolean>>;
+      /** Form field id to open and focus first (e.g. "cn-ops", "sn-kafka", "f-goal"), or null for the top. */
+      readonly focus: string | null;
+    }
   | { readonly kind: 'markdown'; readonly focusId: string | null };
 
 export interface MarkdownPane {
@@ -174,7 +182,7 @@ export type Action =
   | { type: 'view/toggle'; solutionId: string }
   | { type: 'view/setAll'; open: boolean }
   | { type: 'view/toggleSeries'; solutionId: string }
-  | { type: 'edit/start'; id: string }
+  | { type: 'edit/start'; id: string; focus?: string }
   | { type: 'edit/new'; today: string }
   | { type: 'edit/update'; update: (d: Draft) => Draft }
   | { type: 'edit/toggleOpen'; solutionId: string }
@@ -244,10 +252,13 @@ export const reducer = (s: State, a: Action): State => {
 
     case 'edit/start': {
       const adr = findAdr(s.adrs, a.id);
-      return { ...s, screen: { kind: 'edit', draft: toDraft(adr), originalId: adr.id, triedSave: false, open: firstOpen(adr) } };
+      /* Jumping to a solution opens its card so its fields exist to focus. */
+      const focus = a.focus ?? null;
+      const sol = focus !== null && focus.startsWith('sn-') ? focus.slice(3) : null;
+      return { ...s, screen: { kind: 'edit', draft: toDraft(adr), originalId: adr.id, triedSave: false, open: sol === null ? firstOpen(adr) : { [sol]: true }, focus } };
     }
     case 'edit/new':
-      return { ...s, screen: { kind: 'edit', draft: blankDraft(nextAdrId(s.adrs), a.today), originalId: null, triedSave: false, open: {} } };
+      return { ...s, screen: { kind: 'edit', draft: blankDraft(nextAdrId(s.adrs), a.today), originalId: null, triedSave: false, open: {}, focus: null } };
     case 'edit/update': {
       const e = editScreen(s);
       return { ...s, screen: { ...e, draft: a.update(e.draft) } };

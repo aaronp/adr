@@ -119,7 +119,7 @@ export const Dashboard = ({ adrs, query, filter, today, dispatch, onNew }: { adr
                     <span class="row-s wrap-row">
                       <span class="mono strong muted">{a.id}</span>
                       <StatusPill status={a.status} />
-                      <span class="mono small faint">{formatDate(a.date)}</span>
+                      <span class="mono small faint">{a.date === '' ? 'Undated' : formatDate(a.date)}</span>
                     </span>
                     <span class="display-s">{a.title}</span>
                     <span class="clamp-2 muted small-plus">{a.goal}</span>

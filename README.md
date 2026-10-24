@@ -9,7 +9,7 @@ This repo is the viewer; your decisions can live in their own repo and be loaded
 - **Dashboard** with search (title, goal, people, tags, options, criteria), status filters and revisit-due tracking.
 - **ADR view** with goal, hypothesis, people, timeline, collapsible solutions, and four comparison views: matrix, radar, weighted bars and heatmap.
 - **Form** for adding and editing records: 1–5 weights and scores, unscored stays unscored (never zero), and every problem is listed before saving.
-- **Markdown view** with the whole file: edit and apply, copy, download, open or drag in a `.md` file. Parse errors show their line number and nothing is changed until the whole file is valid.
+- **Markdown view** with the whole file: edit and apply, copy, download, open or drag in a `.md` file. Errors (only for what cannot be read, such as a bad date or a score outside 1–5) show their line number, and nothing is changed until the whole file reads.
 - Four themes: Graph paper, Night shift, Blueprint and Warm ledger.
 
 Applied changes are autosaved in the browser (localStorage). **The downloaded `decisions.md` is the real copy**: keep it in git next to your code.
@@ -34,53 +34,20 @@ Sources on another host must allow CORS (GitHub Pages and raw.githubusercontent.
 
 ## The file format
 
-See `src/sample/decisions.md` for a full example. Each record:
+The full format, with a minimal and a complete example, is in **[spec.md](spec.md)**.
+
+It is forgiving: a record needs only a title, and everything else is optional.
 
 ```markdown
 ---
-id: ADR-0012
-title: Choose an event streaming platform
-status: accepted            # proposed | accepted | superseded | deprecated | rejected
-date: 2026-09-14
-revisit: 2027-03-14         # empty for none
-tags: data, infrastructure  # empty for none
-decision: kafka             # a solution id; empty while undecided
+title: Use Postgres for the orders service
 ---
-
-## Goal
-What the decision must achieve.
-
-## Hypothesis
-- We believe: …
-- Will result in: …
-- Measured by: …
-
-## People
-- Priya Shah — decider      # decider | author | consulted | informed
-
-## Criteria
-| id | criterion | weight | description |
-| --- | --- | --- | --- |
-| ops | Operational burden | 5 | Higher = less on-call load. |
-
-## Solution: kafka — Managed Kafka
-Optional summary.
-
-| criterion | score |
-| --- | --- |
-| ops | 3 |                   # 1–5, or - for unscored
-
-Pros:
-- …
-
-Cons:
-- …
-
-## Decision
-Rationale and consequences.
+We need a database for orders that the team already knows how to run.
 ```
 
-(The `#` notes above are explanations, not part of the format.) Every frontmatter key is required, even if its value is empty. Records follow one another in the same file.
+Add `## Goal`, `## Hypothesis`, `## People`, `## Criteria`, `## Solution: …` and `## Decision` sections as the
+decision takes shape. Names and keys match in any case, and text with no field of its own is kept under
+`## Notes`, so saving never loses it. `src/sample/decisions.md` is a fuller example.
 
 ## Viewing locally
 
@@ -142,7 +109,7 @@ Needs Node 22.6+ (tests run TypeScript directly via `--experimental-strip-types`
 | Path | What |
 | --- | --- |
 | `src/core/schema.ts` | TypeBox schemas for the record, with field docs and examples |
-| `src/core/markdown.ts` | Strict parser and serializer. `serialize(parse(x))` gives the standard layout, and parse/serialize round-trips |
+| `src/core/markdown.ts` | Forgiving parser (see spec.md) and serializer. `serialize(parse(x))` gives the standard layout, and parse/serialize round-trips |
 | `src/core/scoring.ts` | Weighted scores and ranking (pure) |
 | `src/core/validate.ts` | Cross-field and cross-record rules |
 | `src/core/form.ts` | Edit-form model and pure draft edits |
