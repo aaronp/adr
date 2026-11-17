@@ -115,6 +115,10 @@ export const AdrSchema = Type.Object(
     people: Type.Array(PersonSchema, { description: 'Everyone involved; at least one decider.' }),
     criteria: Type.Array(CriterionSchema, { description: 'What the options are judged on, with weights.' }),
     solutions: Type.Array(SolutionSchema, { description: 'The proposed options, each scored against every criterion.' }),
+    parent: Type.Union([Type.String({ pattern: '^\\S+$' }), Type.Null()], {
+      description: 'Id of the broader decision this one belongs under, or null for a top-level decision. Children are derived from it.',
+      examples: ['ADR-0012', null]
+    }),
     decision: Type.Union([Type.String({ pattern: SLUG }), Type.Null()], {
       description: 'Id of the chosen solution, or null while undecided / when rejected. Required when status is "accepted".',
       examples: ['kafka', null]

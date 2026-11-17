@@ -21,11 +21,22 @@ const haystack = (a: Adr): string =>
     .join(' ')
     .toLowerCase();
 
-/** Every whitespace-separated token in the query must appear somewhere in the record. Newest first. */
-export const searchAdrs = (adrs: readonly Adr[], query: string, filter: Filter, today: string): Adr[] => {
+/** Every tag used in the ledger with how many records carry it, most used first. */
+export const tagCounts = (adrs: readonly Adr[]): [string, number][] => {
+  const m = new Map<string, number>();
+  for (const t of adrs.flatMap((a) => a.tags)) m.set(t, (m.get(t) ?? 0) + 1);
+  return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+};
+
+/**
+ * Every whitespace-separated token in the query must appear somewhere in the record, and when tags are chosen the
+ * record must carry at least one of them. Newest first.
+ */
+export const searchAdrs = (adrs: readonly Adr[], query: string, filter: Filter, today: string, tags: readonly string[] = []): Adr[] => {
   const tokens = query.toLowerCase().split(/\s+/).filter((t) => t !== '');
   return adrs
     .filter((a) => matchesFilter(a, filter, today))
+    .filter((a) => tags.length === 0 || a.tags.some((t) => tags.includes(t)))
     .filter((a) => {
       const h = haystack(a);
       return tokens.every((t) => h.includes(t));

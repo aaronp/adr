@@ -7,12 +7,18 @@ import { seriesColor } from '../themes.ts';
 import { VIZ, type VizId } from '../state.ts';
 import { Avatar, Dots, Icon, Kicker, RevisitBadge, StatusPill, Swatch, type Dispatch, type Effects } from './common.tsx';
 import { Heatmap, MatrixChart, RadarChart, WeightedBars } from './Charts.tsx';
+import { DeleteDialog } from './DeleteDialog.tsx';
+import { useState } from 'preact/hooks';
 
 const ROLE_GROUP: Record<Role, string> = { decider: 'Deciders', author: 'Authors', consulted: 'Consulted', informed: 'Informed' };
 
 export interface AdrViewProps {
   readonly adr: Adr;
+  /** Every record, to find this one's parent and children. */
+  readonly adrs: readonly Adr[];
   readonly today: string;
+  /** Starts a new record under this one. */
+  readonly onNewChild: () => void;
   readonly viz: VizId;
   readonly expanded: Readonly<Record<string, boolean>>;
   readonly hidden: Readonly<Record<string, boolean>>;
@@ -20,7 +26,7 @@ export interface AdrViewProps {
   readonly fx: Effects;
 }
 
-export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: AdrViewProps) => {
+export const AdrView = ({ adr, adrs, today, onNewChild, viz, expanded, hidden, dispatch, fx }: AdrViewProps) => {
   const model = scoreModel(adr);
   const chosen = adr.decision === null ? null : findRow(model, adr.decision);
   const rv = revisitInfo(adr.revisit, today);
@@ -40,6 +46,14 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
     </button>
   );
   const fileName = `${adr.id.toLowerCase()}.md`;
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const parent = adrs.find((a) => a.id === adr.parent);
+  const children = adrs.filter((a) => a.parent === adr.id);
+  const link = (a: Adr) => (
+    <button key={a.id} type="button" class="link-btn" style={{ minHeight: 0, padding: 0 }} onClick={() => dispatch({ type: 'nav/view', id: a.id })}>
+      <span class="mono">{a.id}</span> {a.title}
+    </button>
+  );
 
   return (
     <main>
@@ -64,6 +78,18 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
                   </span>
                 ))}
               </div>
+              {parent === undefined ? null : (
+                <div class="row-s wrap-row small-plus">
+                  <Kicker>Part of</Kicker>
+                  {link(parent)}
+                </div>
+              )}
+              {children.length === 0 ? null : (
+                <div class="row-s wrap-row small-plus">
+                  <Kicker>Sub-decisions</Kicker>
+                  {children.map(link)}
+                </div>
+              )}
             </div>
             <div class="row-s wrap-row">
               <button type="button" class="btn" onClick={() => fx.copy(md, `${adr.id} markdown`)}>
@@ -75,9 +101,16 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
               <button type="button" class="btn" onClick={() => dispatch({ type: 'nav/markdown', focusId: adr.id })}>
                 <Icon name="code" /> Edit as markdown
               </button>
+              <button type="button" class="btn" onClick={onNewChild}>
+                <Icon name="plus" /> Create child
+              </button>
+              <button type="button" class="btn btn-bad-outline" onClick={() => setConfirmDelete(true)}>
+                <Icon name="trash" /> Delete
+              </button>
               <button type="button" class="btn btn-primary" onClick={() => dispatch({ type: 'edit/start', id: adr.id })}>
                 <Icon name="edit" /> Edit ADR
               </button>
+              {confirmDelete ? <DeleteDialog adr={adr} adrs={adrs} onClose={() => setConfirmDelete(false)} dispatch={dispatch} /> : null}
             </div>
           </div>
         </div>
@@ -115,7 +148,34 @@ export const AdrView = ({ adr, today, viz, expanded, hidden, dispatch, fx }: Adr
             </div>
             {n === 0 || model.rows.length === 0 ? (
               <div class="empty-inline">
-                {n === 0 && model.rows.length === 0 ? 'Add criteria and solutions to compare them.' : n === 0 ? 'Add criteria to score the solutions against.' : 'Add solutions to compare against these criteria.'}
+                {/* "cn-" / "sn-" open the edit form on the Criteria / Solutions section. */}
+                {n === 0 && model.rows.length === 0 ? (
+                  <>
+                    Add{' '}
+                    <button type="button" class="inline-link" onClick={editAt('cn-')}>
+                      criteria
+                    </button>{' '}
+                    and{' '}
+                    <button type="button" class="inline-link" onClick={editAt('sn-')}>
+                      solutions
+                    </button>{' '}
+                    to compare them.
+                  </>
+                ) : n === 0 ? (
+                  <>
+                    <button type="button" class="inline-link" onClick={editAt('cn-')}>
+                      Add criteria
+                    </button>{' '}
+                    to score the solutions against.
+                  </>
+                ) : (
+                  <>
+                    <button type="button" class="inline-link" onClick={editAt('sn-')}>
+                      Add solutions
+                    </button>{' '}
+                    to compare against these criteria.
+                  </>
+                )}
               </div>
             ) : viz === 'matrix' ? (
               <MatrixChart model={model} decision={adr.decision} onEdit={(focus) => editAt(focus)()} />

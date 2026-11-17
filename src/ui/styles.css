@@ -143,6 +143,7 @@ fieldset { margin: 0; min-width: 0; }
 .btn-invert { border: 0; background: var(--on-chrome); color: var(--chrome); }
 .btn-dashed { align-self: flex-start; border-style: dashed; border-color: var(--border-strong); }
 .btn-bad { border-color: var(--bad); background: var(--bad); color: var(--surface); }
+.btn-bad-outline { border-color: var(--bad); color: var(--bad); }
 .btn-s { min-height: 36px; padding: 0 12px; font-size: 13px; }
 .btn-block { width: 100%; min-height: 48px; font-size: 15px; }
 .icon-btn { flex: 0 0 44px; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--control-border); background: var(--surface); color: var(--text-2); }
@@ -183,7 +184,6 @@ textarea.input { resize: vertical; }
 /* atoms */
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .pill-lg { font-size: 13px; padding: 3px 11px; }
-.pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .status-proposed { background: var(--info-bg); color: var(--info-fg); }
 .status-accepted { background: var(--good-bg); color: var(--good); }
 .status-superseded { background: var(--neutral-bg); color: var(--neutral-fg); }
@@ -236,12 +236,13 @@ textarea.input { resize: vertical; }
 .tile { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 18px 20px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--surface); color: var(--ink); text-align: left; }
 .tile.on { border-color: var(--ink); }
 .tile-value { font-family: var(--font-display); font-size: 40px; line-height: 1; font-weight: 700; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
-.search { flex: 1 1 340px; display: flex; flex-direction: column; gap: 6px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.toolbar-end { margin-left: auto; }
+.tool-btn { gap: 6px; }
+.toolbar .search-box { flex: 0 1 360px; }
 .search-box { position: relative; color: var(--faint); }
-.search-box svg { position: absolute; left: 14px; top: 13px; }
-.search-box .input { padding-left: 42px; min-height: 46px; border-radius: 10px; }
-.toolbar .chips { flex: 999 1 520px; }
+.search-box > svg { position: absolute; left: 14px; top: 13px; }
+.search-box .input { padding-left: 42px; min-height: 44px; border-radius: 999px; }
 .list { overflow: hidden; display: flex; flex-direction: column; }
 .list-row { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: center; width: 100%; padding: 20px 24px; border: 0; border-bottom: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); text-align: left; }
 .list-row:last-child { border-bottom: 0; }
@@ -387,3 +388,46 @@ textarea.input { resize: vertical; }
 .acc-row .edit-icon { opacity: 0; transition: opacity 120ms; }
 .acc:hover .acc-row .edit-icon, .acc-row .edit-icon:focus-visible { opacity: 1; }
 @media (hover: none) { .acc-row .edit-icon { opacity: 1; } }
+
+/* Sankey (dashboard) */
+.sankey-node { cursor: pointer; }
+.sankey-box { fill: var(--surface-2); stroke: var(--border); }
+.sankey-node:hover .sankey-box, .sankey-node:focus-visible .sankey-box { stroke: var(--ink); stroke-width: 2; }
+.sankey-node:focus { outline: none; }
+.sankey-id { font: 600 12px var(--font-mono); fill: var(--muted); }
+.sankey-title { font-size: 13px; font-weight: 500; fill: var(--ink); }
+
+/* File menu (header) */
+.menu { position: relative; }
+.menu > summary { list-style: none; cursor: pointer; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 230px; padding: 6px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25); }
+.menu-item { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--ink); font-size: 14px; font-weight: 500; text-align: left; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--muted-bg); }
+
+/* Collapsible bar (edit form hypothesis) */
+.disclosure { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.disclosure > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 48px; padding: 0 16px; cursor: pointer; list-style: none; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::before { content: '▸'; color: var(--muted); transition: transform 0.15s; }
+.disclosure[open] > summary::before { transform: rotate(90deg); }
+.disclosure[open] > summary { border-bottom: 1px solid var(--border-soft); }
+.disclosure > .grid-auto { padding: 16px; }
+.push-right { margin-left: auto; }
+
+/* Status picker (edit form): the status pills as a radio group */
+.status-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.status-opt { position: relative; min-height: 40px; padding: 0 14px; cursor: pointer; border: 2px solid transparent; opacity: 0.6; }
+.status-opt:hover { opacity: 0.9; }
+.status-opt:has(input:checked) { opacity: 1; border-color: currentColor; }
+.status-opt:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+fieldset.field { border: 0; padding: 0; }
+fieldset.field > legend { padding: 0; margin-bottom: 5px; }
+.inline-link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* Tag and status filters (dashboard toolbar) */
+.filter-badge { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; padding: 0 8px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface); font: 600 12px var(--font-mono); cursor: pointer; }
+.tag-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.chip-sm { min-height: 34px; padding: 0 12px; font-size: 13px; }
+.menu-heading { padding: 10px 12px 4px; border-top: 1px solid var(--border-soft); margin-top: 4px; font: 600 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.menu-badge { display: block; align-self: flex-start; margin: 4px 12px 6px; height: 20px; }

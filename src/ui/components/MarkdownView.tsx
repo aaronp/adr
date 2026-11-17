@@ -81,18 +81,7 @@ export const MarkdownView = ({ md, focusId, sampleMarkdown, storage, dispatch, f
             <div class="stack-xs">
               <Kicker>Source of truth · {FILE_NAME}</Kicker>
               <h1 class="display-l">Markdown</h1>
-              <span class="muted small-plus measure">Every record lives in this one file. Edit it here, or open your own; download it to keep it in git alongside your code.</span>
-            </div>
-            <div class="row-s wrap-row">
-              <button type="button" class="btn" onClick={() => dispatch({ type: 'open/show' })}>
-                <Icon name="upload" /> Open…
-              </button>
-              <button type="button" class="btn" onClick={() => fx.copy(md.text, 'Markdown')}>
-                <Icon name="copy" /> Copy
-              </button>
-              <button type="button" class="btn" onClick={() => fx.download(FILE_NAME, md.text)}>
-                <Icon name="download" /> Download {FILE_NAME}
-              </button>
+              <span class="muted small-plus measure">Every record lives in this one file. Edit it here; use the File menu to open another or download it to keep in git alongside your code.</span>
             </div>
           </div>
         </div>

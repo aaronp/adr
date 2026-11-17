@@ -7,8 +7,10 @@ Architecture decision records (ADRs) driven by **one markdown file**. Open `dist
 This repo is the viewer; your decisions can live in their own repo and be loaded with `?src=` (see [Publishing your own ledger](#publishing-your-own-ledger)).
 
 - **Dashboard** with search (title, goal, people, tags, options, criteria), status filters and revisit-due tracking.
+- **Hierarchy**: give a record a `parent:` and the dashboard can show it as a list, an indented hierarchy, or a sankey of decisions flowing into sub-decisions. Each record links to its parent and children.
 - **ADR view** with goal, hypothesis, people, timeline, collapsible solutions, and four comparison views: matrix, radar, weighted bars and heatmap.
 - **Form** for adding and editing records: 1–5 weights and scores, unscored stays unscored (never zero), and every problem is listed before saving.
+- **File menu**: start a new, empty ledger (it offers to download the current one first), open, download, or copy a share link that carries the whole ledger.
 - **Markdown view** with the whole file: edit and apply, copy, download, open or drag in a `.md` file. Errors (only for what cannot be read, such as a bad date or a score outside 1–5) show their line number, and nothing is changed until the whole file reads.
 - Four themes: Graph paper, Night shift, Blueprint and Warm ledger.
 
@@ -18,6 +20,7 @@ Applied changes are autosaved in the browser (localStorage). **The downloaded `d
 | --- | --- |
 | _(none)_ | The file saved in this browser, or the bundled sample. |
 | `?src=<url>` | That markdown file (absolute, or relative to the page). It is not autosaved, so it never overwrites your saved file. |
+| `#data=<packed>` | A ledger carried in the link itself (File → Copy share link): the markdown, deflated and base64url-encoded. Not autosaved either. |
 
 Add any of these to choose what shows (unknown values are ignored):
 
@@ -25,6 +28,7 @@ Add any of these to choose what shows (unknown values are ignored):
 | --- | --- |
 | `adr` | A record id, e.g. `ADR-0012`: opens that record |
 | `page` | `dashboard` (default) or `markdown` |
+| `layout` | Dashboard view: `list` (default), `tree`, `sankey` |
 | `viz` | `radar` (default), `matrix`, `weighted`, `heatmap` |
 | `theme` | `paper` (default), `night`, `blueprint`, `warm`; wins over the theme saved in the browser |
 
