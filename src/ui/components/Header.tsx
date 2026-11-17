@@ -1,7 +1,59 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
+import type { Adr } from '../../core/schema.ts';
+import { serializeLedger } from '../../core/markdown.ts';
 import { THEMES, type ThemeId } from '../themes.ts';
-import { Icon, type Dispatch } from './common.tsx';
+import { Icon, type Dispatch, type Effects } from './common.tsx';
 
-export const Header = ({ theme, todayLabel, onNew, dispatch }: { theme: ThemeId; todayLabel: string; onNew: () => void; dispatch: Dispatch }) => (
+/** New, Open, Download and Share, in a native <details> menu that closes on a pick, Esc or a click elsewhere. */
+const FileMenu = ({ adrs, badge, dispatch, fx }: { adrs: readonly Adr[]; badge: () => string; dispatch: Dispatch; fx: Effects }) => {
+  const menu = useRef<HTMLDetailsElement>(null);
+  /* Drawn when the menu opens, so it picks up the theme's colours as they are now. */
+  const [preview, setPreview] = useState('');
+  useEffect(() => {
+    const close = (e: Event) => {
+      const m = menu.current;
+      if (m !== null && (e instanceof KeyboardEvent ? e.key === 'Escape' : !m.contains(e.target as Node))) m.open = false;
+    };
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('click', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, []);
+  const item = (icon: Parameters<typeof Icon>[0]['name'], label: string, run: () => void) => (
+    <button
+      type="button"
+      role="menuitem"
+      class="menu-item"
+      onClick={() => {
+        if (menu.current !== null) menu.current.open = false;
+        run();
+      }}
+    >
+      <Icon name={icon} /> {label}
+    </button>
+  );
+  return (
+    <details ref={menu} class="menu" onToggle={(e) => setPreview(e.currentTarget.open ? badge() : '')}>
+      <summary class="chrome-link">
+        <Icon name="folder" /> File <Icon name="down" size={14} />
+      </summary>
+      <div class="menu-pop" role="menu">
+        {item('plus', 'New ledger…', () => dispatch(adrs.length === 0 ? { type: 'file/new' } : { type: 'file/confirmNew' }))}
+        {item('upload', 'Open…', () => dispatch({ type: 'open/show' }))}
+        {item('download', 'Download decisions.md', () => fx.download('decisions.md', serializeLedger(adrs)))}
+        {item('copy', 'Copy share link', () => fx.share(serializeLedger(adrs)))}
+        <span class="menu-heading">Status badge (SVG)</span>
+        {preview === '' ? null : <img class="menu-badge" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview)}`} alt="" />}
+        {item('copy', 'Copy badge', () => fx.copy(badge(), 'Badge SVG'))}
+        {item('download', 'Download badge.svg', () => fx.download('decisions-badge.svg', badge(), 'image/svg+xml'))}
+      </div>
+    </details>
+  );
+};
+
+export const Header = ({ theme, todayLabel, onNew, adrs, badge, dispatch, fx }: { theme: ThemeId; todayLabel: string; onNew: () => void; adrs: readonly Adr[]; badge: () => string; dispatch: Dispatch; fx: Effects }) => (
   <header class="chrome">
     <div class="wrap chrome-row">
       <button type="button" class="brand" onClick={() => dispatch({ type: 'nav/dashboard' })}>
@@ -33,9 +85,7 @@ export const Header = ({ theme, todayLabel, onNew, dispatch }: { theme: ThemeId;
         <button type="button" class="chrome-link" onClick={() => dispatch({ type: 'nav/dashboard' })}>
           All decisions
         </button>
-        <button type="button" class="chrome-link" onClick={() => dispatch({ type: 'open/show' })}>
-          <Icon name="folder" /> Open
-        </button>
+        <FileMenu adrs={adrs} badge={badge} dispatch={dispatch} fx={fx} />
         <button type="button" class="chrome-link" onClick={() => dispatch({ type: 'nav/markdown', focusId: null })}>
           <Icon name="code" /> Markdown
         </button>

@@ -8,10 +8,12 @@ export type Dispatch = (a: Action) => void;
 /** Side effects the UI can request. Implemented in main.tsx; each reports its own failures. */
 export interface Effects {
   copy(text: string, what: string): void;
-  download(fileName: string, text: string): void;
+  download(fileName: string, text: string, mime?: string): void;
   openFile(file: File): void;
   /** Fetches a URL and loads it; rejects with a message to show, so the caller can keep its dialog open. */
   openUrl(url: string): Promise<void>;
+  /** Copies a link that carries the whole ledger (see core/share.ts). */
+  share(markdown: string): void;
 }
 
 const ICONS = {
@@ -20,6 +22,7 @@ const ICONS = {
   x: 'M6 6l12 12M18 6L6 18',
   check: 'M5 12l5 5 9-10',
   back: 'M15 18l-6-6 6-6',
+  forward: 'M9 18l6-6-6-6',
   up: 'M6 15l6-6 6 6',
   down: 'M6 9l6 6 6-6',
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-3.5-3.5',
@@ -30,7 +33,12 @@ const ICONS = {
   upload: 'M12 20V9M7 14l5-5 5 5M5 4h14',
   folder: 'M3 6h6l2 2h10v11H3z',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
-  reset: 'M4 12a8 8 0 1 0 3-6.2M4 4v5h5'
+  reset: 'M4 12a8 8 0 1 0 3-6.2M4 4v5h5',
+  clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
+  swap: 'M4 8h14l-4-4M20 16H6l4 4',
+  archive: 'M3 4h18v5H3zM5 9v11h14V9M10 13h4',
+  filter: 'M3 5h18l-7 8v6l-4 2v-8z',
+  ban: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8'
 } as const;
 export type IconName = keyof typeof ICONS;
 
@@ -48,10 +56,11 @@ const STATUS_LABEL: Record<Status, string> = {
   rejected: 'Rejected'
 };
 export const statusLabel = (s: Status): string => STATUS_LABEL[s];
+export const STATUS_ICON: Record<Status, IconName> = { proposed: 'clock', accepted: 'check', superseded: 'swap', deprecated: 'archive', rejected: 'ban' };
 
 export const StatusPill = ({ status, large = false }: { status: Status; large?: boolean }) => (
   <span class={`pill status-${status}${large ? ' pill-lg' : ''}`}>
-    <span class="pill-dot" aria-hidden="true" />
+    <Icon name={STATUS_ICON[status]} size={large ? 14 : 12} />
     {STATUS_LABEL[status]}
   </span>
 );

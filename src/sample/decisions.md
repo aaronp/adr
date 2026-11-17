@@ -119,6 +119,7 @@ status: proposed
 date: 2026-10-10
 revisit: 
 tags: api, contracts
+parent: ADR-0012
 decision: 
 ---
 
@@ -223,6 +224,7 @@ status: accepted
 date: 2026-07-02
 revisit: 2026-11-01
 tags: delivery
+parent: ADR-0009
 decision: oss
 ---
 
@@ -378,6 +380,7 @@ status: rejected
 date: 2026-08-21
 revisit: 
 tags: frontend
+parent: ADR-0009
 decision: 
 ---
 

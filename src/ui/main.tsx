@@ -16,6 +16,16 @@ import { AdrView } from './components/AdrView.tsx';
 import { EditForm } from './components/EditForm.tsx';
 import { MarkdownView } from './components/MarkdownView.tsx';
 import { OpenDialog } from './components/OpenDialog.tsx';
+import { NewDialog } from './components/NewDialog.tsx';
+import { packLedger, unpackLedger } from '../core/share.ts';
+import { badgeSvg } from '../core/badge.ts';
+
+/** The badge in the current theme's colours, read from the page's CSS variables. */
+const themedBadge = (adrs: State['adrs'], today: string): string => {
+  const css = getComputedStyle(document.documentElement);
+  const v = (name: string) => css.getPropertyValue(name).trim();
+  return badgeSvg(adrs, today, { accepted: v('--good'), proposed: v('--accent'), due: v('--bad'), text: v('--surface') });
+};
 import type { Effects } from './components/common.tsx';
 
 interface AppProps {
@@ -65,7 +75,7 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
     else if (url !== location.pathname + location.search + location.hash) history.replaceState(null, '', url);
     lastPage.current = key;
     popping.current = false;
-  }, [state.screen, state.viz, state.theme]);
+  }, [state.screen, state.viz, state.theme, state.layout]);
   useEffect(() => {
     // Back/Forward: show what the URL says (no ?page or ?adr means the dashboard); the effect above then only tidies the URL.
     const onPop = () => {
@@ -95,9 +105,9 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
           (e: unknown) => dispatch({ type: 'toast/show', kind: 'error', text: e instanceof Error ? e.message : String(e) })
         );
       },
-      download: (fileName, text) => {
+      download: (fileName, text, mime) => {
         try {
-          downloadText(fileName, text);
+          downloadText(fileName, text, mime);
           dispatch({ type: 'toast/show', kind: 'ok', text: `Downloaded ${fileName}.` });
         } catch (e) {
           dispatch({ type: 'toast/show', kind: 'error', text: `Download failed: ${e instanceof Error ? e.message : String(e)}` });
@@ -108,6 +118,14 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
           (text) => dispatch({ type: 'md/load', text, source: file.name }),
           (e: unknown) => dispatch({ type: 'toast/show', kind: 'error', text: e instanceof Error ? e.message : String(e) })
         );
+      },
+      share: (markdown) => {
+        packLedger(markdown)
+          .then((packed) => copyText(`${location.href.split(/[?#]/)[0]}#data=${packed}`))
+          .then(
+            () => dispatch({ type: 'toast/show', kind: 'ok', text: 'Share link copied: it holds the whole ledger, so anyone who opens it sees this copy.' }),
+            (e: unknown) => dispatch({ type: 'toast/show', kind: 'error', text: `Could not copy a share link: ${e instanceof Error ? e.message : String(e)}` })
+          );
       },
       openUrl: (url) =>
         fetchText(url).then(
@@ -125,12 +143,12 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
   let body;
   switch (s.kind) {
     case 'dashboard':
-      body = <Dashboard adrs={state.adrs} query={state.query} filter={state.filter} today={today} dispatch={dispatch} onNew={onNew} />;
+      body = <Dashboard adrs={state.adrs} query={state.query} filter={state.filter} tags={state.tags} layout={state.layout} today={today} dispatch={dispatch} onNew={onNew} />;
       break;
     case 'view': {
       const adr = state.adrs.find((a) => a.id === s.id);
       if (adr === undefined) throw new Error(`bug: viewing missing record ${s.id}`);
-      body = <AdrView adr={adr} today={today} viz={state.viz} expanded={state.expanded} hidden={state.hidden} dispatch={dispatch} fx={fx} />;
+      body = <AdrView adr={adr} adrs={state.adrs} today={today} onNewChild={() => dispatch({ type: 'edit/new', today, parent: adr.id })} viz={state.viz} expanded={state.expanded} hidden={state.hidden} dispatch={dispatch} fx={fx} />;
       break;
     }
     case 'edit':
@@ -147,9 +165,10 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
 
   return (
     <div class="app">
-      <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} dispatch={dispatch} />
+      <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} adrs={state.adrs} badge={() => themedBadge(state.adrs, today)} dispatch={dispatch} fx={fx} />
       {body}
       {state.openDialog ? <OpenDialog dispatch={dispatch} fx={fx} /> : null}
+      {state.newDialog ? <NewDialog count={state.adrs.length} onDownload={() => fx.download('decisions.md', serializeLedger(state.adrs))} dispatch={dispatch} /> : null}
       <div class="toast-host" aria-live="polite">
         {state.toast !== null ? (
           <div class={`toast toast-${state.toast.kind}`} role={state.toast.kind === 'error' ? 'alert' : 'status'}>
@@ -178,7 +197,15 @@ const boot = (source: { url: string; markdown: string } | null, loadError: strin
   render(<App today={toIsoDate(new Date())} initial={withWarning} store={store} storage={storage} saveMarkdown={source === null} />, root);
 };
 
-if (srcParam === null) boot(null, null);
+/** #data=<packed> (from File → Copy share link): the whole ledger carried in the link itself. Like ?src=, it is not autosaved. */
+const dataParam = new URLSearchParams(location.hash.slice(1)).get('data');
+
+if (dataParam !== null) {
+  unpackLedger(dataParam).then(
+    (markdown) => boot({ url: 'The shared link', markdown }, null),
+    (e: unknown) => boot(null, `Could not open the shared link: ${e instanceof Error ? e.message : String(e)}. Showing your saved file instead.`)
+  );
+} else if (srcParam === null) boot(null, null);
 else {
   fetchText(srcParam).then(
     (r) => boot(r, null),

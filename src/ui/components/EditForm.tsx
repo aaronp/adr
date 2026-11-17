@@ -4,10 +4,11 @@ import { ROLES, STATUSES } from '../../core/schema.ts';
 import { plural } from '../../core/dates.ts';
 import { scoreLabel, scoreModel, scoreOf } from '../../core/scoring.ts';
 import { fromDraft, removeCriterion, removeSolution, setScore, type Draft } from '../../core/form.ts';
-import { validateAdr } from '../../core/validate.ts';
+import { ancestors, validateAdr } from '../../core/validate.ts';
 import type { Adr } from '../../core/schema.ts';
 import { rampColor, seriesColor } from '../themes.ts';
-import { Avatar, Icon, Kicker, Swatch, statusLabel, type Dispatch } from './common.tsx';
+import { Avatar, Icon, Kicker, STATUS_ICON, Swatch, statusLabel, type Dispatch } from './common.tsx';
+import { DeleteDialog } from './DeleteDialog.tsx';
 
 type TabId = 'basics' | 'criteria' | 'people' | 'solutions' | 'decision';
 /** The tab that holds a form field, from its id prefix. */
@@ -126,6 +127,7 @@ const LineList = ({ id, label, tone, placeholder, value, onChange }: { id: strin
 
 export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, dispatch }: EditFormProps) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const saved = adrs.find((a) => a.id === originalId);
   const update = (fn: (d: Draft) => Draft) => dispatch({ type: 'edit/update', update: fn });
   const errors = triedSave ? validateAdr(fromDraft(d), adrs, originalId) : [];
   const model = scoreModel(d);
@@ -166,6 +168,18 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
     el.focus({ preventScroll: true });
     setFocusId(null);
   }, [focusId, tab, open]);
+  /* After an Add button, focus the new row's name field (ids are made by the reducer, so take the last one drawn). */
+  const [focusNew, setFocusNew] = useState<'pn' | 'cn' | 'sn' | null>(null);
+  useEffect(() => {
+    if (focusNew === null) return;
+    const all = document.querySelectorAll<HTMLElement>(`[id^="${focusNew}-"]`);
+    all[all.length - 1]?.focus();
+    setFocusNew(null);
+  }, [focusNew, d.people.length, d.criteria.length, d.solutions.length]);
+  /* Leaving a section drops people rows left without a name (saving drops them too; see fromDraft). */
+  useEffect(() => {
+    if (d.people.some((p) => p.name.trim() === '')) update((x) => ({ ...x, people: x.people.filter((p) => p.name.trim() !== '') }));
+  }, [tab]);
   const goToSolution = (id: string) => {
     if (open[id] !== true) dispatch({ type: 'edit/toggleOpen', solutionId: id });
     setTab('solutions');
@@ -175,6 +189,34 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
     setTab('criteria');
     setFocusId(`cn-${id}`);
   };
+  const at = tabs.findIndex((t) => t.id === tab);
+  const prevTab = tabs[at - 1];
+  const nextTab = tabs[at + 1];
+  const goTab = (t: (typeof tabs)[number] | undefined) => {
+    if (t === undefined) return;
+    setTab(t.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  /*
+   * Cmd/Ctrl + ← / → steps between sections. In a text field it only acts once the caret is already at that
+   * edge, so Cmd+arrow still jumps to the start or end of the line first (press again to change section).
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      const el = document.activeElement;
+      if ((el instanceof HTMLInputElement && el.selectionStart !== null) || el instanceof HTMLTextAreaElement) {
+        const edge = e.key === 'ArrowLeft' ? 0 : el.value.length;
+        if (el.selectionStart !== edge || el.selectionEnd !== edge) return;
+      }
+      const t = e.key === 'ArrowLeft' ? prevTab : nextTab;
+      if (t === undefined) return;
+      e.preventDefault();
+      goTab(t);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
   const onTabKey = (e: KeyboardEvent) => {
     const i = tabs.findIndex((t) => t.id === tab);
     const next = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : null;
@@ -254,13 +296,19 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
                       <input id="f-id" class="input mono" value={d.id} onInput={(e) => update((x) => ({ ...x, id: e.currentTarget.value }))} />
                     </div>
                     <div class="field">
-                      <label for="f-status">Status</label>
-                      <select id="f-status" class="input" value={d.status} onChange={(e) => update((x) => ({ ...x, status: e.currentTarget.value as Status }))}>
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {statusLabel(s)}
-                          </option>
-                        ))}
+                      <label for="f-parent">
+                        Parent <span class="normal muted">(optional)</span>
+                      </label>
+                      <select id="f-parent" class="input" value={d.parent} onChange={(e) => update((x) => ({ ...x, parent: e.currentTarget.value }))}>
+                        <option value="">None (top level)</option>
+                        {/* Not itself, nor anything under it: that would make a loop. */}
+                        {adrs
+                          .filter((a) => a.id !== originalId && !ancestors(a.id, adrs).some((p) => p === originalId))
+                          .map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.id} · {a.title}
+                            </option>
+                          ))}
                       </select>
                     </div>
                     <div class="field">
@@ -279,6 +327,25 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
                       </div>
                     </div>
                   </div>
+                  <fieldset class="field">
+                    <legend class="field-label">Status</legend>
+                    <div class="status-picker">
+                      {STATUSES.map((s) => (
+                        <label key={s} class={`pill pill-lg status-${s} status-opt`}>
+                          <input
+                            type="radio"
+                            name="f-status"
+                            id={d.status === s ? 'f-status' : undefined}
+                            class="visually-hidden"
+                            checked={d.status === s}
+                            onChange={() => update((x) => ({ ...x, status: s as Status }))}
+                          />
+                          <Icon name={STATUS_ICON[s]} size={14} />
+                          {statusLabel(s)}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                   <div class="field">
                     <label for="f-title">Title</label>
                     <input id="f-title" class="input input-title" value={d.title} placeholder="Choose a … for …" onInput={(e) => update((x) => ({ ...x, title: e.currentTarget.value }))} />
@@ -326,39 +393,48 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
                     <label for="f-goal">Goal — what must this decision achieve?</label>
                     <textarea id="f-goal" class="input input-lg" rows={3} value={d.goal} onInput={(e) => update((x) => ({ ...x, goal: e.currentTarget.value }))} />
                   </div>
-                  <div class="grid-auto grid-wide">
-                    {(
-                      [
-                        ['believe', 'We believe…', 'the change we are making'],
-                        ['willResultIn', '…will result in…', 'the outcome we expect'],
-                        ['measuredBy', 'We’ll know when…', 'the signal or metric that proves it']
-                      ] as const
-                    ).map(([key, label, ph]) => (
-                      <div key={key} class="field">
-                        <label for={`f-h-${key}`} class="hyp-label">
-                          {label}
-                        </label>
-                        <textarea
-                          id={`f-h-${key}`}
-                          class="input"
-                          rows={3}
-                          placeholder={ph}
-                          value={d.hypothesis[key]}
-                          onInput={(e) => {
-                            const v = e.currentTarget.value;
-                            update((x) => ({ ...x, hypothesis: { ...x.hypothesis, [key]: v } }));
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  <details class="disclosure" open={focus !== null && focus.startsWith('f-h-')}>
+                    <summary>
+                      <span class="strong">Hypothesis</span>
+                      <span class="small muted">We believe… will result in… we’ll know when…</span>
+                      <span class="mono small muted push-right">
+                        {Object.values(d.hypothesis).filter((v) => v.trim() !== '').length} of 3 filled
+                      </span>
+                    </summary>
+                    <div class="grid-auto grid-wide">
+                      {(
+                        [
+                          ['believe', 'We believe…', 'the change we are making'],
+                          ['willResultIn', '…will result in…', 'the outcome we expect'],
+                          ['measuredBy', 'We’ll know when…', 'the signal or metric that proves it']
+                        ] as const
+                      ).map(([key, label, ph]) => (
+                        <div key={key} class="field">
+                          <label for={`f-h-${key}`} class="hyp-label">
+                            {label}
+                          </label>
+                          <textarea
+                            id={`f-h-${key}`}
+                            class="input"
+                            rows={3}
+                            placeholder={ph}
+                            value={d.hypothesis[key]}
+                            onInput={(e) => {
+                              const v = e.currentTarget.value;
+                              update((x) => ({ ...x, hypothesis: { ...x.hypothesis, [key]: v } }));
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 </fieldset>
               ) : null}
 
               {tab === 'people' ? (
                 <fieldset class="card pad stack-s">
                   <legend class="legend">People</legend>
-                  {d.people.map((p) => (
+                  {d.people.map((p, i) => (
                     <div key={p.rowId} class="row-fields">
                       <Avatar person={p} size={36} />
                       <div class="field grow-main">
@@ -370,6 +446,17 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
                           onInput={(e) => {
                             const v = e.currentTarget.value;
                             update((x) => ({ ...x, people: x.people.map((q) => (q.rowId === p.rowId ? { ...q, name: v } : q)) }));
+                          }}
+                          onKeyDown={(e) => {
+                            /* Enter goes to the next person (adding a row after the last one) instead of submitting the form. */
+                            if (e.key !== 'Enter' || e.isComposing) return;
+                            e.preventDefault();
+                            const next = d.people[i + 1];
+                            if (next !== undefined) document.getElementById(`pn-${next.rowId}`)?.focus();
+                            else if (p.name.trim() !== '') {
+                              dispatch({ type: 'edit/addPerson' });
+                              setFocusNew('pn');
+                            }
                           }}
                         />
                       </div>
@@ -396,7 +483,10 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
                       </button>
                     </div>
                   ))}
-                  <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addPerson' })}>
+                  <button type="button" class="btn btn-dashed" onClick={() => {
+                    dispatch({ type: 'edit/addPerson' });
+                    setFocusNew('pn');
+                  }}>
                     <Icon name="plus" /> Add person
                   </button>
                 </fieldset>
@@ -446,7 +536,10 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
                       </div>
                     );
                   })}
-                  <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addCriterion' })}>
+                  <button type="button" class="btn btn-dashed" onClick={() => {
+                    dispatch({ type: 'edit/addCriterion' });
+                    setFocusNew('cn');
+                  }}>
                     <Icon name="plus" /> Add criterion
                   </button>
                 </fieldset>
@@ -517,7 +610,10 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
                       </div>
                     );
                   })}
-                  <button type="button" class="btn btn-dashed" onClick={() => dispatch({ type: 'edit/addSolution' })}>
+                  <button type="button" class="btn btn-dashed" onClick={() => {
+                    dispatch({ type: 'edit/addSolution' });
+                    setFocusNew('sn');
+                  }}>
                     <Icon name="plus" /> Add solution
                   </button>
                 </fieldset>
@@ -549,26 +645,34 @@ export const EditForm = ({ draft: d, originalId, triedSave, open, focus, adrs, d
                 </fieldset>
               ) : null}
 
+              <div class="row-between wrap-row">
+                {prevTab === undefined ? (
+                  <span />
+                ) : (
+                  <button type="button" class="btn" title="⌘/Ctrl + ←" onClick={() => goTab(prevTab)}>
+                    <Icon name="back" /> Back: {prevTab.label}
+                  </button>
+                )}
+                {nextTab === undefined ? (
+                  <button type="button" class="btn btn-primary" onClick={save}>
+                    <Icon name="check" /> Save ADR
+                  </button>
+                ) : (
+                  <button type="button" class="btn btn-primary" title="⌘/Ctrl + →" onClick={() => goTab(nextTab)}>
+                    Next: {nextTab.label} <Icon name="forward" />
+                  </button>
+                )}
+              </div>
+              <span class="small faint">Tip: ⌘/Ctrl + ← / → moves between sections. Everything you type is kept until you save.</span>
             </div>
           </div>
 
           {isNew ? null : (
             <div class="danger-zone">
-              {confirmDelete ? (
-                <div class="row-s wrap-row">
-                  <span class="small-plus">Delete {originalId} from the file? This cannot be undone (except by reloading a saved .md).</span>
-                  <button type="button" class="btn btn-bad" onClick={() => dispatch({ type: 'edit/delete' })}>
-                    <Icon name="trash" /> Delete
-                  </button>
-                  <button type="button" class="btn" onClick={() => setConfirmDelete(false)}>
-                    Keep it
-                  </button>
-                </div>
-              ) : (
-                <button type="button" class="link-btn bad" onClick={() => setConfirmDelete(true)}>
-                  <Icon name="trash" /> Delete this ADR…
-                </button>
-              )}
+              <button type="button" class="link-btn bad" onClick={() => setConfirmDelete(true)}>
+                <Icon name="trash" /> Delete this ADR…
+              </button>
+              {confirmDelete && saved !== undefined ? <DeleteDialog adr={saved} adrs={adrs} onClose={() => setConfirmDelete(false)} dispatch={dispatch} /> : null}
             </div>
           )}
         </form>

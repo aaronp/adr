@@ -9,7 +9,7 @@
  *   title: Choose an event streaming platform
  *   status: accepted             (default: proposed)
  *   date: 2026-09-14             (default: none)
- *   revisit: 2027-03-14          tags: data, infrastructure     decision: kafka
+ *   revisit: 2027-03-14          tags: data, infrastructure     parent: ADR-0009     decision: kafka
  *   ---
  *
  *   ## Goal            text (text before the first section is part of the goal too)
@@ -44,7 +44,7 @@ export interface ParsedRecord {
   readonly line: number;
 }
 
-const FRONTMATTER_KEYS = ['id', 'title', 'status', 'date', 'revisit', 'tags', 'decision'] as const;
+const FRONTMATTER_KEYS = ['id', 'title', 'status', 'date', 'revisit', 'tags', 'parent', 'decision'] as const;
 type FrontmatterKey = (typeof FRONTMATTER_KEYS)[number];
 const SLUG = '[a-z0-9][a-z0-9-]*';
 const SLUG_RE = new RegExp(`^${SLUG}$`);
@@ -86,6 +86,8 @@ export const serializeAdr = (adr: Adr): string => {
     `date: ${adr.date}`,
     `revisit: ${adr.revisit ?? ''}`,
     `tags: ${adr.tags.join(', ')}`,
+    /* Only written when set, so files without a hierarchy keep their layout. */
+    ...(adr.parent === null ? [] : [`parent: ${adr.parent}`]),
     `decision: ${adr.decision ?? ''}`,
     '---',
     '',
@@ -375,6 +377,7 @@ const parseRecord = (lines: readonly Line[], open: number, close: number, end: n
       .split(',')
       .map((x) => x.trim())
       .filter((x) => x !== ''),
+    parent: fm.parent !== undefined && fm.parent !== '' ? fm.parent : null,
     goal: [textOf(lead), textOf(named('goal'))].filter((x) => x !== '').join('\n\n'),
     hypothesis: hyp.hypothesis,
     people: parsePeople(named('people')),

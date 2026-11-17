@@ -4,7 +4,7 @@
  */
 import type { Adr } from '../core/schema.ts';
 import { MarkdownError, parseLedger, serializeLedger } from '../core/markdown.ts';
-import { validateAdr, validateLedger } from '../core/validate.ts';
+import { ancestors, validateAdr, validateLedger } from '../core/validate.ts';
 import { addCriterion, addSolution, blankDraft, fromDraft, nextAdrId, toDraft, type Draft } from '../core/form.ts';
 import { FILTERS, type Filter } from '../core/search.ts';
 import { isThemeId, type ThemeId } from './themes.ts';
@@ -17,6 +17,13 @@ export const VIZ = [
   { id: 'heatmap', label: 'Heatmap' }
 ] as const;
 export type VizId = (typeof VIZ)[number]['id'];
+
+export const LAYOUTS = [
+  { id: 'list', label: 'List' },
+  { id: 'tree', label: 'Hierarchy' },
+  { id: 'sankey', label: 'Sankey' }
+] as const;
+export type LayoutId = (typeof LAYOUTS)[number]['id'];
 
 export type Screen =
   | { readonly kind: 'dashboard' }
@@ -54,6 +61,10 @@ export interface State {
   readonly theme: ThemeId;
   readonly query: string;
   readonly filter: Filter;
+  /** Tags chosen in the dashboard's filter panel; a record must carry one of them. Empty = no tag filter. */
+  readonly tags: readonly string[];
+  /** How the dashboard shows the records. */
+  readonly layout: LayoutId;
   /** Accordion state on the ADR view, by solution id. */
   readonly expanded: Readonly<Record<string, boolean>>;
   /** Radar series hidden by the user, by solution id. */
@@ -64,6 +75,8 @@ export interface State {
   readonly toast: Toast | null;
   /** The Open dialog (drop, pick or fetch a file) is showing. */
   readonly openDialog: boolean;
+  /** The "start a new ledger?" confirmation is showing. */
+  readonly newDialog: boolean;
 }
 
 export interface InitInput {
@@ -117,10 +130,13 @@ const createStartState = (input: InitInput): State => {
     viz: 'radar' as VizId,
     query: '',
     filter: 'all' as Filter,
+    tags: [],
+    layout: 'list' as LayoutId,
     expanded: {},
     hidden: {},
     seq: 1,
-    openDialog: false
+    openDialog: false,
+    newDialog: false
   };
   const badTheme = input.storedTheme !== null && !isThemeId(input.storedTheme);
   const theme: ThemeId = input.storedTheme !== null && isThemeId(input.storedTheme) ? input.storedTheme : 'paper';
@@ -154,7 +170,7 @@ const createStartState = (input: InitInput): State => {
 
 /** Applies address-bar prefs. A file that failed to load stays on its error; an unknown record id is reported, not guessed. */
 export const applyPrefs = (s: State, p: UrlPrefs): State => {
-  const styled = { ...s, ...(p.theme !== undefined ? { theme: p.theme } : {}), ...(p.viz !== undefined ? { viz: p.viz } : {}) };
+  const styled = { ...s, ...(p.theme !== undefined ? { theme: p.theme } : {}), ...(p.viz !== undefined ? { viz: p.viz } : {}), ...(p.layout !== undefined ? { layout: p.layout } : {}) };
   if (p.page === undefined || (s.screen.kind === 'markdown' && s.md.error !== null)) return styled;
   switch (p.page.kind) {
     case 'dashboard':
@@ -172,18 +188,24 @@ export type Action =
   | { type: 'url/apply'; prefs: UrlPrefs }
   | { type: 'open/show' }
   | { type: 'open/hide' }
+  | { type: 'file/confirmNew' }
+  | { type: 'file/cancelNew' }
+  | { type: 'file/new' }
   | { type: 'nav/dashboard' }
   | { type: 'nav/view'; id: string }
   | { type: 'nav/markdown'; focusId: string | null }
   | { type: 'theme/set'; theme: ThemeId }
   | { type: 'dash/query'; value: string }
   | { type: 'dash/filter'; filter: Filter }
+  | { type: 'dash/layout'; layout: LayoutId }
+  | { type: 'dash/toggleTag'; tag: string }
+  | { type: 'dash/clearTags' }
   | { type: 'view/viz'; viz: VizId }
   | { type: 'view/toggle'; solutionId: string }
   | { type: 'view/setAll'; open: boolean }
   | { type: 'view/toggleSeries'; solutionId: string }
   | { type: 'edit/start'; id: string; focus?: string }
-  | { type: 'edit/new'; today: string }
+  | { type: 'edit/new'; today: string; parent?: string }
   | { type: 'edit/update'; update: (d: Draft) => Draft }
   | { type: 'edit/toggleOpen'; solutionId: string }
   | { type: 'edit/addPerson' }
@@ -191,7 +213,8 @@ export type Action =
   | { type: 'edit/addSolution' }
   | { type: 'edit/save' }
   | { type: 'edit/cancel' }
-  | { type: 'edit/delete' }
+  /** Removes a record. Its sub-decisions go too (withChildren), or stay as top-level records. */
+  | { type: 'adr/delete'; id: string; withChildren: boolean }
   | { type: 'md/text'; value: string }
   | { type: 'md/apply' }
   | { type: 'md/discard' }
@@ -221,6 +244,12 @@ export const reducer = (s: State, a: Action): State => {
       return { ...s, openDialog: true };
     case 'open/hide':
       return { ...s, openDialog: false };
+    case 'file/confirmNew':
+      return { ...s, newDialog: true };
+    case 'file/cancelNew':
+      return { ...s, newDialog: false };
+    case 'file/new':
+      return toast({ ...s, adrs: [], newDialog: false, screen: { kind: 'dashboard' }, query: '', filter: 'all', tags: [], md: { text: '', base: '', error: null, notice: null } }, 'ok', 'Started a new, empty ledger.');
     case 'nav/dashboard':
       return { ...s, screen: { kind: 'dashboard' } };
     case 'nav/view': {
@@ -238,6 +267,12 @@ export const reducer = (s: State, a: Action): State => {
     case 'dash/filter':
       if (!FILTERS.includes(a.filter)) throw new Error(`bug: unknown filter "${a.filter}"`);
       return { ...s, filter: a.filter };
+    case 'dash/toggleTag':
+      return { ...s, tags: s.tags.includes(a.tag) ? s.tags.filter((t) => t !== a.tag) : [...s.tags, a.tag] };
+    case 'dash/clearTags':
+      return { ...s, tags: [] };
+    case 'dash/layout':
+      return { ...s, layout: a.layout };
     case 'view/viz':
       return { ...s, viz: a.viz };
     case 'view/toggle':
@@ -258,7 +293,7 @@ export const reducer = (s: State, a: Action): State => {
       return { ...s, screen: { kind: 'edit', draft: toDraft(adr), originalId: adr.id, triedSave: false, open: sol === null ? firstOpen(adr) : { [sol]: true }, focus } };
     }
     case 'edit/new':
-      return { ...s, screen: { kind: 'edit', draft: blankDraft(nextAdrId(s.adrs), a.today), originalId: null, triedSave: false, open: {}, focus: null } };
+      return { ...s, screen: { kind: 'edit', draft: { ...blankDraft(nextAdrId(s.adrs), a.today), parent: a.parent ?? '' }, originalId: null, triedSave: false, open: {}, focus: 'f-title' } };
     case 'edit/update': {
       const e = editScreen(s);
       return { ...s, screen: { ...e, draft: a.update(e.draft) } };
@@ -284,18 +319,20 @@ export const reducer = (s: State, a: Action): State => {
       const e = editScreen(s);
       const adr = fromDraft(e.draft);
       if (validateAdr(adr, s.adrs, e.originalId).length > 0) return { ...s, screen: { ...e, triedSave: true } };
-      const adrs = e.originalId === null ? [...s.adrs, adr] : s.adrs.map((x) => (x.id === e.originalId ? adr : x));
+      /* A renamed record takes its children with it. */
+      const adrs = e.originalId === null ? [...s.adrs, adr] : s.adrs.map((x) => (x.id === e.originalId ? adr : x.parent === e.originalId ? { ...x, parent: adr.id } : x));
       return toast({ ...withAdrs(s, adrs), screen: { kind: 'view', id: adr.id }, expanded: firstOpen(adr), hidden: {} }, 'ok', `Saved ${adr.id}.`);
     }
     case 'edit/cancel': {
       const e = editScreen(s);
       return { ...s, screen: e.originalId === null ? { kind: 'dashboard' } : { kind: 'view', id: e.originalId } };
     }
-    case 'edit/delete': {
-      const e = editScreen(s);
-      if (e.originalId === null) throw new Error('bug: delete on an unsaved record');
-      const id = e.originalId;
-      return toast({ ...withAdrs(s, s.adrs.filter((x) => x.id !== id)), screen: { kind: 'dashboard' } }, 'ok', `Deleted ${id}.`);
+    case 'adr/delete': {
+      const { id } = findAdr(s.adrs, a.id);
+      const gone = (x: Adr) => x.id === id || (a.withChildren && ancestors(x.id, s.adrs).includes(id));
+      const n = s.adrs.filter(gone).length;
+      const adrs = s.adrs.filter((x) => !gone(x)).map((x) => (x.parent === id ? { ...x, parent: null } : x));
+      return toast({ ...withAdrs(s, adrs), screen: { kind: 'dashboard' } }, 'ok', n === 1 ? `Deleted ${id}.` : `Deleted ${id} and ${n - 1} sub-decision${n === 2 ? '' : 's'}.`);
     }
 
     case 'md/text':

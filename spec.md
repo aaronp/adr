@@ -112,6 +112,7 @@ until the next `---` line that starts another record's front matter.
 | `date` | When it was decided or proposed, `YYYY-MM-DD` | none ("Undated") |
 | `revisit` | When to check the hypothesis again, `YYYY-MM-DD` | none |
 | `tags` | Comma-separated labels (`[a, b]` works too) | none |
+| `parent` | The id of a broader record this one sits under. Children are worked out from their parents. | none (top level) |
 | `decision` | The chosen solution, by id or name | none (undecided) |
 
 Keys match in any case, unknown keys are ignored, and a `# comment` after a
@@ -191,12 +192,13 @@ line:
 - a `date` or `revisit` that is not a real `YYYY-MM-DD` date;
 - a weight or score that is not a whole number 1–5;
 - front matter that never closes with `---`;
+- a `parent` that is not a record in the file, is the record itself, or would make a loop;
 - text before the first record's `---`.
 
 ## How the app saves
 
 When the app saves (or "tidies") a file, it writes every record in the
-standard layout of the full example above: every front-matter key, the sections
+standard layout of the full example above: every front-matter key (`parent` only when set), the sections
 in order, and any kept text under `## Notes`. Reading that file back gives the
 same records.
 

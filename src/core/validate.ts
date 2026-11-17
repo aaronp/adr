@@ -7,6 +7,13 @@ import { AdrSchema, ROLES, STATUSES, type Adr } from './schema.ts';
 import { daysBetween, isDate } from './dates.ts';
 import { scoreOf } from './scoring.ts';
 
+/** Ids above `id`, nearest first. Stops at a missing parent or a repeat, so a bad file cannot loop forever. */
+export const ancestors = (id: string, ledger: readonly Pick<Adr, 'id' | 'parent'>[]): string[] => {
+  const out: string[] = [];
+  for (let p = ledger.find((a) => a.id === id)?.parent ?? null; p !== null && !out.includes(p); p = ledger.find((a) => a.id === p)?.parent ?? null) out.push(p);
+  return out;
+};
+
 /**
  * @param adr        the record to check
  * @param ledger     every other record it must be unique against
@@ -59,6 +66,12 @@ export const validateAdr = (adr: Adr, ledger: readonly Adr[], originalId: string
       if (!critIds.has(key)) E.push(`Solution "${s.name}" has a score for unknown criterion "${key}".`);
     }
   });
+
+  if (adr.parent !== null) {
+    if (adr.parent === adr.id) E.push('A record cannot be its own parent.');
+    else if (!ledger.some((a) => a.id === adr.parent)) E.push(`Parent ${adr.parent} is not a record in this file.`);
+    else if (ancestors(adr.parent, ledger).some((x) => x === adr.id || x === originalId)) E.push(`Parent ${adr.parent} is already under ${adr.id}, which would make a loop.`);
+  }
 
   if (adr.decision !== null && !solIds.has(adr.decision)) E.push('The chosen solution does not exist.');
 

@@ -114,7 +114,7 @@ export const OpenDialog = ({ dispatch, fx }: { dispatch: Dispatch; fx: Effects }
               {busy ? 'Opening…' : 'Open'}
             </button>
           </div>
-          <span class="small muted">To share a file, link to it with ?src= instead; opened files replace the records shown here.</span>
+          <span class="small muted">To share, use File → Copy share link, or link to a hosted file with ?src=. Opened files replace the records shown here.</span>
         </form>
 
         {error === null ? null : (

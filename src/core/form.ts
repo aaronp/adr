@@ -14,6 +14,7 @@ export const DraftSchema = Type.Object(
     date: Type.String({ description: 'YYYY-MM-DD, as produced by <input type="date">.' }),
     revisit: Type.String({ description: 'YYYY-MM-DD, or "" for no revisit.' }),
     tagsText: Type.String({ description: 'Comma-separated, exactly as typed.', examples: ['data, infrastructure'] }),
+    parent: Type.String({ description: 'Parent record id, or "" for none.' }),
     goal: Type.String(),
     hypothesis: HypothesisSchema,
     people: Type.Array(
@@ -59,6 +60,7 @@ export const toDraft = (adr: Adr): Draft => ({
   date: adr.date,
   revisit: adr.revisit ?? '',
   tagsText: adr.tags.join(', '),
+  parent: adr.parent ?? '',
   goal: adr.goal,
   hypothesis: { ...adr.hypothesis },
   people: adr.people.map((p, i) => ({ rowId: `person-${i}`, name: p.name, role: p.role })),
@@ -96,9 +98,11 @@ export const fromDraft = (d: Draft): Adr => ({
     .split(',')
     .map((t) => t.trim())
     .filter((t) => t !== ''),
+  parent: d.parent === '' ? null : d.parent,
   goal: d.goal.trim(),
   hypothesis: { believe: d.hypothesis.believe.trim(), willResultIn: d.hypothesis.willResultIn.trim(), measuredBy: d.hypothesis.measuredBy.trim() },
-  people: d.people.map((p) => ({ name: p.name.trim(), role: p.role })),
+  /* A row left without a name is an unused blank, not a mistake: it is dropped. */
+  people: d.people.filter((p) => p.name.trim() !== '').map((p) => ({ name: p.name.trim(), role: p.role })),
   // weight may be null here; validateAdr rejects it. The cast documents that hand-off.
   criteria: d.criteria.map((c) => ({ id: c.id, name: c.name.trim(), weight: c.weight as number, description: c.description.trim() })),
   solutions: d.solutions.map((s) => ({
@@ -121,6 +125,7 @@ export const blankDraft = (id: string, today: string): Draft => ({
   date: today,
   revisit: '',
   tagsText: '',
+  parent: '',
   goal: '',
   hypothesis: { believe: '', willResultIn: '', measuredBy: '' },
   people: [],

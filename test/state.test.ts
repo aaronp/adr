@@ -85,7 +85,7 @@ test('opening a file loads it; the result is the normal form', () => {
 });
 
 test('delete removes the record from the file', () => {
-  const s = run(fresh(), { type: 'edit/start', id: 'ADR-0014' }, { type: 'edit/delete' });
+  const s = run(fresh(), { type: 'adr/delete', id: 'ADR-0014', withChildren: false });
   assert.equal(s.adrs.some((a) => a.id === 'ADR-0014'), false);
   assert.doesNotMatch(s.md.text, /ADR-0014/);
 });
