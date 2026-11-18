@@ -66,15 +66,25 @@ const capitalise = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 /** Checks a parsed sidecar. Unknown legend ids are dropped with a warning; any other mismatch throws. */
 export const parsePrefs = (json: unknown): { prefs: CardPrefs; warnings: string[] } => {
   const warnings: string[] = [];
+  /* Links used to be designable; they are generated now, so a `url` from older settings is dropped. */
+  const noUrl = (o: unknown): unknown => {
+    if (typeof o !== 'object' || o === null || Array.isArray(o)) return o;
+    const { url: _url, ...rest } = o as Record<string, unknown>;
+    return rest;
+  };
   let input = json;
-  if (typeof json === 'object' && json !== null && Array.isArray((json as { legend?: unknown }).legend)) {
-    const legend = (json as { legend: unknown[] }).legend.filter((l) => {
-      const id = typeof l === 'object' && l !== null ? (l as { id?: unknown }).id : undefined;
-      if (isStatus(id)) return true;
-      warnings.push(`Unknown legend id "${String(id)}" (expected one of: ${STATUSES.join(', ')})`);
-      return false;
-    });
-    input = { ...json, legend };
+  if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
+    const j = json as { legend?: unknown; source?: unknown };
+    input = { ...json, ...(j.source !== undefined ? { source: noUrl(j.source) } : {}) };
+    if (Array.isArray(j.legend)) {
+      const legend = j.legend.map(noUrl).filter((l) => {
+        const id = typeof l === 'object' && l !== null ? (l as { id?: unknown }).id : undefined;
+        if (isStatus(id)) return true;
+        warnings.push(`Unknown legend id "${String(id)}" (expected one of: ${STATUSES.join(', ')})`);
+        return false;
+      });
+      input = { ...(input as object), legend };
+    }
   }
   if (!Value.Check(CardPrefsSchema, input)) {
     const e = Value.Errors(CardPrefsSchema, input).First();

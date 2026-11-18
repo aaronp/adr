@@ -78,9 +78,10 @@ test('card links open the hosted viewer on that file, filtered', () => {
   assert.equal(card([], {}, TODAY, { label: 'a b.md', src: 'a b.md?x=1&y' }).source.url, `${ADR_HOST}?src=a%20b.md%3Fx%3D1%26y`);
 });
 
-test('card settings no longer carry links', () => {
-  assert.throws(() => parsePrefs({ source: { url: 'https://x/' } }));
-  assert.throws(() => parsePrefs({ legend: [{ id: 'accepted', url: 'https://x/' }] }));
+test('links in older card settings are ignored, not an error', () => {
+  const r = parsePrefs({ title: 'My Decisions', source: { label: 'd.md', url: 'foo' }, legend: [{ id: 'accepted', url: 'https://x/' }] });
+  assert.deepEqual(r.prefs, { title: 'My Decisions', source: { label: 'd.md' }, legend: [{ id: 'accepted' }] });
+  assert.deepEqual(r.warnings, []);
 });
 
 test('parsePrefs drops unknown legend ids with a warning', () => {

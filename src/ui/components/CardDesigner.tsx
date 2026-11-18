@@ -139,13 +139,7 @@ export const CardDesigner = ({ adrs, today, src, store, save, dispatch, fx }: { 
 
   useEffect(() => {
     if (design !== null) kept = { src, design };
-    if (design === null || !save || store === null) return;
-    try {
-      store.write(STORAGE_KEYS.card, JSON.stringify(toPrefs(design)));
-    } catch {
-      /* Storage full or blocked: the designer still works; Download keeps the settings. */
-    }
-  }, [design, save, store]);
+  }, [design]);
 
   const header = (
     <section class="hero">
@@ -163,7 +157,17 @@ export const CardDesigner = ({ adrs, today, src, store, save, dispatch, fx }: { 
   );
   if (design === null) return <main>{header}<div class="wrap page muted">Loading…</div></main>;
 
-  const set = (patch: Partial<Design>) => setDesign({ ...design, ...patch });
+  /* Saved only when edited, so loading (or falling back to defaults after a bad load) never overwrites stored settings. */
+  const set = (patch: Partial<Design>) => {
+    const next = { ...design, ...patch };
+    setDesign(next);
+    if (!save || store === null) return;
+    try {
+      store.write(STORAGE_KEYS.card, JSON.stringify(toPrefs(next)));
+    } catch {
+      /* Storage full or blocked: the designer still works; Download keeps the settings. */
+    }
+  };
   const setRow = (i: number, patch: Partial<Row>) => set({ rows: design.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
   const move = (i: number, by: -1 | 1) => {
     const rows = [...design.rows];
