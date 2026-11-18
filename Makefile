@@ -1,6 +1,6 @@
 PORT ?= 8000
 
-.PHONY: dev build test check dist publish
+.PHONY: dev build test check dist publish bump-patch bump-minor bump-major
 node_modules: package-lock.json
 	npm ci
 	@touch node_modules
@@ -18,7 +18,11 @@ check: node_modules
 dist: check
 	npm pack
 
-# Publishes @pritzlaff/adr to npm. Bump first: npm version patch|minor|major
+# Bumps package.json, commits and tags v<version> (needs a clean tree)
+bump-patch bump-minor bump-major:
+	npm version $(@:bump-%=%)
+
+# Publishes @pritzlaff/adr to npm. Bump first: make bump-patch|bump-minor|bump-major
 publish: check
 	npm publish
 
