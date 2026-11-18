@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import type { Adr } from '../../core/schema.ts';
 import { serializeLedger } from '../../core/markdown.ts';
 import { THEMES, type ThemeId } from '../themes.ts';
 import { Icon, type Dispatch, type Effects } from './common.tsx';
 
 /** New, Open, Download and Share, in a native <details> menu that closes on a pick, Esc or a click elsewhere. */
-const FileMenu = ({ adrs, badge, dispatch, fx }: { adrs: readonly Adr[]; badge: () => string; dispatch: Dispatch; fx: Effects }) => {
+const FileMenu = ({ adrs, dispatch, fx }: { adrs: readonly Adr[]; dispatch: Dispatch; fx: Effects }) => {
   const menu = useRef<HTMLDetailsElement>(null);
-  /* Drawn when the menu opens, so it picks up the theme's colours as they are now. */
-  const [preview, setPreview] = useState('');
   useEffect(() => {
     const close = (e: Event) => {
       const m = menu.current;
@@ -35,7 +33,7 @@ const FileMenu = ({ adrs, badge, dispatch, fx }: { adrs: readonly Adr[]; badge: 
     </button>
   );
   return (
-    <details ref={menu} class="menu" onToggle={(e) => setPreview(e.currentTarget.open ? badge() : '')}>
+    <details ref={menu} class="menu">
       <summary class="chrome-link">
         <Icon name="folder" /> File <Icon name="down" size={14} />
       </summary>
@@ -44,16 +42,12 @@ const FileMenu = ({ adrs, badge, dispatch, fx }: { adrs: readonly Adr[]; badge: 
         {item('upload', 'Open…', () => dispatch({ type: 'open/show' }))}
         {item('download', 'Download decisions.md', () => fx.download('decisions.md', serializeLedger(adrs)))}
         {item('copy', 'Copy share link', () => fx.share(serializeLedger(adrs)))}
-        <span class="menu-heading">Status badge (SVG)</span>
-        {preview === '' ? null : <img class="menu-badge" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview)}`} alt="" />}
-        {item('copy', 'Copy badge', () => fx.copy(badge(), 'Badge SVG'))}
-        {item('download', 'Download badge.svg', () => fx.download('decisions-badge.svg', badge(), 'image/svg+xml'))}
       </div>
     </details>
   );
 };
 
-export const Header = ({ theme, todayLabel, onNew, adrs, badge, dispatch, fx }: { theme: ThemeId; todayLabel: string; onNew: () => void; adrs: readonly Adr[]; badge: () => string; dispatch: Dispatch; fx: Effects }) => (
+export const Header = ({ theme, todayLabel, onNew, adrs, dispatch, fx }: { theme: ThemeId; todayLabel: string; onNew: () => void; adrs: readonly Adr[]; dispatch: Dispatch; fx: Effects }) => (
   <header class="chrome">
     <div class="wrap chrome-row">
       <button type="button" class="brand" onClick={() => dispatch({ type: 'nav/dashboard' })}>
@@ -85,7 +79,7 @@ export const Header = ({ theme, todayLabel, onNew, adrs, badge, dispatch, fx }: 
         <button type="button" class="chrome-link" onClick={() => dispatch({ type: 'nav/dashboard' })}>
           All decisions
         </button>
-        <FileMenu adrs={adrs} badge={badge} dispatch={dispatch} fx={fx} />
+        <FileMenu adrs={adrs} dispatch={dispatch} fx={fx} />
         <button type="button" class="chrome-link" onClick={() => dispatch({ type: 'nav/markdown', focusId: null })}>
           <Icon name="code" /> Markdown
         </button>

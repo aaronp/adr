@@ -49,24 +49,22 @@ await mkdir('dist', { recursive: true });
 await writeFile('dist/decision-ledger.html', html);
 await writeFile('dist/index.html', html);
 
-// dist/badge.mjs: the same badge for the `adr badge` CLI (Node, no DOM), in the paper theme's colours.
+// dist/card.mjs: card.json and the badge for the `adr card` / `adr badge` CLI (Node, no DOM).
 await build({
   stdin: {
     resolveDir: 'src/core',
     loader: 'ts',
     contents: `
-      import { parseLedger } from './markdown.ts';
-      import { badgeSvg } from './badge.ts';
-      // ponytail: paper theme colours copied from styles.css; pass a theme if anyone wants night/blueprint badges.
-      export const badge = (markdown: string, today: string) =>
-        badgeSvg(parseLedger(markdown), today, { accepted: '#0B6B5F', proposed: '#1F45B0', due: '#A3283C', text: '#FFFFFF' });`
+      export { parseLedger } from './markdown.ts';
+      export { card, parsePrefs } from './card.ts';
+      export { badgeSvg } from './badge.ts';`
   },
   bundle: true,
   format: 'esm',
   platform: 'node',
   target: 'node18',
   minify: true,
-  outfile: 'dist/badge.mjs',
+  outfile: 'dist/card.mjs',
   logLevel: 'warning'
 });
-console.log(`dist/decision-ledger.html, dist/index.html  ${(html.length / 1024).toFixed(1)} KB, dist/badge.mjs`);
+console.log(`dist/decision-ledger.html, dist/index.html  ${(html.length / 1024).toFixed(1)} KB, dist/card.mjs`);

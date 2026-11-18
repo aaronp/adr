@@ -110,13 +110,3 @@ test('tag filter keeps records carrying any chosen tag', () => {
   assert.deepEqual(ids(['frontend', 'auth']), ['ADR-0006', 'ADR-0014']);
   assert.equal(ids([]).length, all.length);
 });
-
-test('badge counts accepted, proposed and due revisits', async () => {
-  const { badgeSvg } = await import('../src/core/badge.ts');
-  const all = parseLedger(readSample());
-  const svg = badgeSvg(all, '2026-11-17', { accepted: '#0a0', proposed: '#00a', due: '#a00', text: '#fff' });
-  assert.match(svg, /^<svg [^>]*width="\d+" height="20"/);
-  assert.match(svg, /A: 3 ✅/);
-  assert.match(svg, /P: 1 ⏳/);
-  assert.match(svg, /D: 2 ⚠️/);
-});

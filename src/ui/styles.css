@@ -430,4 +430,3 @@ fieldset.field > legend { padding: 0; margin-bottom: 5px; }
 .tag-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .chip-sm { min-height: 34px; padding: 0 12px; font-size: 13px; }
 .menu-heading { padding: 10px 12px 4px; border-top: 1px solid var(--border-soft); margin-top: 4px; font: 600 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.menu-badge { display: block; align-self: flex-start; margin: 4px 12px 6px; height: 20px; }

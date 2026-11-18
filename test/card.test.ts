@@ -4,6 +4,7 @@ import { Value } from '@sinclair/typebox/value';
 import { parseLedger } from '../src/core/markdown.ts';
 import { STATUSES, type Adr } from '../src/core/schema.ts';
 import { CardSchema, DEFAULT_COLORS, card, parsePrefs } from '../src/core/card.ts';
+import { badgeSvg } from '../src/core/badge.ts';
 import { readSample } from './helpers.ts';
 
 const TODAY = '2026-10-24';
@@ -78,4 +79,38 @@ test('parsePrefs drops unknown legend ids with a warning', () => {
 test('parsePrefs rejects a bad shape', () => {
   assert.throws(() => parsePrefs({ legend: 'x' }));
   assert.throws(() => parsePrefs({ heading: { primary: 'nope' } }));
+});
+
+const base = card([], { legend: [{ id: 'accepted' }, { id: 'proposed' }, { id: 'superseded' }] }, TODAY, 'd.md');
+const withReport = (report: Record<string, number>) => ({ ...base, report });
+
+test('badge: title then one segment per non-zero legend item', () => {
+  const svg = badgeSvg(withReport({ accepted: 9, proposed: 1, superseded: 0 }));
+  assert.match(svg, />Decisions</);
+  assert.match(svg, />Accepted 9</);
+  assert.match(svg, />Proposed 1</);
+  assert.doesNotMatch(svg, /Superseded/);
+  assert.match(svg, /fill="#555"/);
+  assert.match(svg, new RegExp(`fill="${DEFAULT_COLORS.accepted}"`));
+  assert.match(svg, new RegExp(`fill="${DEFAULT_COLORS.proposed}"`));
+  assert.match(svg, /aria-label="Decisions: 9 accepted, 1 proposed"/);
+});
+
+test('badge: legend item without a colour is grey', () => {
+  const svg = badgeSvg({ ...withReport({ accepted: 2 }), legend: [{ id: 'accepted', label: 'Accepted' }] });
+  assert.match(svg, /fill="#6B7280"/);
+});
+
+test('badge: nothing to count shows the title only', () => {
+  for (const c of [withReport({ accepted: 0, proposed: 0, superseded: 0 }), { ...base, legend: [], report: {} }]) {
+    const svg = badgeSvg(c);
+    assert.equal((svg.match(/<rect /g) ?? []).length, 2); // the clip rect and the title
+    assert.match(svg, /aria-label="Decisions: none"/);
+  }
+});
+
+test('badge escapes text', () => {
+  const svg = badgeSvg({ ...withReport({ accepted: 1 }), title: 'R&D <x>' });
+  assert.match(svg, /R&amp;D &lt;x&gt;/);
+  assert.doesNotMatch(svg, /R&D/);
 });

@@ -10,10 +10,10 @@ import { basename, dirname, join, resolve } from 'node:path';
 if (process.argv[2] === 'badge') {
   const [md, out = dirname(md ?? '')] = process.argv.slice(3);
   if (!md) { console.error('Usage: adr badge <decisions.md> [out-dir]'); process.exit(1); }
-  const { badge } = await import('../dist/badge.mjs');
+  const { parseLedger, card, badgeSvg } = await import('../dist/card.mjs');
   try {
     const target = join(out, 'badge.svg');
-    await writeFile(target, badge(await readFile(md, 'utf8'), new Date().toLocaleDateString('en-CA')));
+    await writeFile(target, badgeSvg(card(parseLedger(await readFile(md, 'utf8')), {}, new Date().toLocaleDateString('en-CA'), md)));
     console.log(`Wrote ${target}`);
   } catch (e) {
     console.error(`adr: ${md}: ${e.message}`);

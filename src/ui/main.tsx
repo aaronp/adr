@@ -18,14 +18,6 @@ import { MarkdownView } from './components/MarkdownView.tsx';
 import { OpenDialog } from './components/OpenDialog.tsx';
 import { NewDialog } from './components/NewDialog.tsx';
 import { packLedger, unpackLedger } from '../core/share.ts';
-import { badgeSvg } from '../core/badge.ts';
-
-/** The badge in the current theme's colours, read from the page's CSS variables. */
-const themedBadge = (adrs: State['adrs'], today: string): string => {
-  const css = getComputedStyle(document.documentElement);
-  const v = (name: string) => css.getPropertyValue(name).trim();
-  return badgeSvg(adrs, today, { accepted: v('--good'), proposed: v('--accent'), due: v('--bad'), text: v('--surface') });
-};
 import type { Effects } from './components/common.tsx';
 
 interface AppProps {
@@ -165,7 +157,7 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
 
   return (
     <div class="app">
-      <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} adrs={state.adrs} badge={() => themedBadge(state.adrs, today)} dispatch={dispatch} fx={fx} />
+      <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} adrs={state.adrs} dispatch={dispatch} fx={fx} />
       {body}
       {state.openDialog ? <OpenDialog dispatch={dispatch} fx={fx} /> : null}
       {state.newDialog ? <NewDialog count={state.adrs.length} onDownload={() => fx.download('decisions.md', serializeLedger(state.adrs))} dispatch={dispatch} /> : null}
