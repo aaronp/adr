@@ -1,6 +1,6 @@
 {
   "name": "@pritzlaff/adr",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Architecture decision records driven by a single markdown file. Builds to one standalone HTML page.",
   "license": "MIT",
   "repository": {
