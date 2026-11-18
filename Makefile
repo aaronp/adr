@@ -1,6 +1,6 @@
 PORT ?= 8000
 
-.PHONY: dev build test check
+.PHONY: dev build test check dist publish
 node_modules: package-lock.json
 	npm ci
 	@touch node_modules
@@ -13,6 +13,14 @@ test: node_modules
 
 check: node_modules
 	npm run check
+
+# Packs the `adr` CLI into pritzlaff-adr-<version>.tgz (install with: npm i -D ./pritzlaff-adr-*.tgz)
+dist: check
+	npm pack
+
+# Publishes @pritzlaff/adr to npm. Bump first: npm version patch|minor|major
+publish: check
+	npm publish
 
 # Serves the built page at / and everything else from the repo, as on GitHub Pages (so ?src=examples/... works).
 dev: build
