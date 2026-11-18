@@ -62,6 +62,21 @@ make dev     # builds, then serves with Bun on http://localhost:8000/ and prints
 The built page is served at `/` and the rest of the repo beside it, as on GitHub Pages, so
 `http://localhost:8000/?src=examples/acme-decisions/decisions.md` works.
 
+## The `adr` CLI
+
+```sh
+bunx @pritzlaff/adr decisions.md   # or npx; no install needed
+bun i -d @pritzlaff/adr            # or add it to a project, then: bunx adr decisions.md
+```
+
+It serves the viewer and that file on localhost and opens the browser.
+
+Releasing: `npm version patch` (or minor/major), then `make publish` (check, then `npm publish`).
+`make dist` packs the same thing into a local `.tgz` without publishing.
+
+The file is re-read on each reload. `PORT=8000` fixes the port; `NO_OPEN=1` skips opening a browser.
+The package has no runtime dependencies: it is `bin/adr.mjs` plus the built `dist/decision-ledger.html`.
+
 ## Hosting
 
 `.github/workflows/pages.yml` typechecks, tests and builds on pushes to `main` or `master`, then
