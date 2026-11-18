@@ -3,7 +3,7 @@
  * persists state changes. Everything else is pure (state.ts reducer + core/).
  */
 import { render } from 'preact';
-import { useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import sampleMarkdown from '../sample/decisions.md';
 import { formatDate, toIsoDate } from '../core/dates.ts';
 import { serializeLedger } from '../core/markdown.ts';
@@ -31,10 +31,41 @@ interface AppProps {
   readonly initial: State;
   readonly store: Store | null;
   readonly storage: { available: true } | { available: false; reason: string };
+  /** Why the requested ?src= or #data= could not be opened, shown as a modal until dismissed. */
+  readonly loadError: string | null;
 }
 
-const App = ({ today, initial, store, storage, saveMarkdown, src }: AppProps) => {
+/** A blocking notice for a source or file that failed to open, so what is showing is never mistaken for it. */
+const LoadErrorDialog = ({ text, onClose }: { text: string; onClose: () => void }) => {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = dialog.current;
+    if (d === null) throw new Error('bug: load error dialog not mounted');
+    d.showModal();
+    return () => d.close();
+  }, []);
+  return (
+    <dialog ref={dialog} class="modal" role="alertdialog" aria-labelledby="load-err-h" aria-describedby="load-err-t" onClose={onClose}>
+      <div class="modal-body stack-m">
+        <h2 id="load-err-h" class="display-s">
+          Could not open that file
+        </h2>
+        <span id="load-err-t" class="small-plus">
+          {text}
+        </span>
+        <div class="row-s">
+          <button type="button" class="btn" onClick={onClose}>
+            OK
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+};
+
+const App = ({ today, initial, store, storage, saveMarkdown, src, loadError }: AppProps) => {
   const [state, dispatch] = useReducer(reducer, initial);
+  const [alert, setAlert] = useState(loadError);
 
   // Persist applied records (not unapplied editor text) and the theme.
   useEffect(() => {
@@ -111,7 +142,7 @@ const App = ({ today, initial, store, storage, saveMarkdown, src }: AppProps) =>
       openFile: (file) => {
         readTextFile(file).then(
           (text) => dispatch({ type: 'md/load', text, source: file.name }),
-          (e: unknown) => dispatch({ type: 'toast/show', kind: 'error', text: e instanceof Error ? e.message : String(e) })
+          (e: unknown) => setAlert(e instanceof Error ? e.message : String(e))
         );
       },
       share: (markdown) => {
@@ -166,6 +197,7 @@ const App = ({ today, initial, store, storage, saveMarkdown, src }: AppProps) =>
       <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} adrs={state.adrs} dispatch={dispatch} fx={fx} />
       {body}
       {state.openDialog ? <OpenDialog dispatch={dispatch} fx={fx} /> : null}
+      {alert !== null ? <LoadErrorDialog text={alert} onClose={() => setAlert(null)} /> : null}
       {state.newDialog ? <NewDialog count={state.adrs.length} onDownload={() => fx.download('decisions.md', serializeLedger(state.adrs))} dispatch={dispatch} /> : null}
       <div class="toast-host" aria-live="polite">
         {state.toast !== null ? (
@@ -190,23 +222,25 @@ const srcParam = new URLSearchParams(location.search).get('src') ?? new URLSearc
 
 const boot = (source: { url: string; markdown: string } | null, loadError: string | null) => {
   const initial = createInitialState({ source, storedMarkdown: read(STORAGE_KEYS.markdown), storedTheme: read(STORAGE_KEYS.theme), sampleMarkdown, prefs: fromQuery(location.search) });
-  const warning = loadError ?? (browser.available ? null : 'This browser is blocking storage, so nothing will be remembered. Download decisions.md to keep your work.');
+  const warning = browser.available ? null : 'This browser is blocking storage, so nothing will be remembered. Download decisions.md to keep your work.';
   const withWarning: State = warning === null ? initial : { ...initial, seq: initial.seq + 1, toast: { id: initial.seq, kind: 'error', text: warning } };
-  render(<App today={toIsoDate(new Date())} initial={withWarning} store={store} storage={storage} saveMarkdown={source === null} src={cardSrc(srcParam, source !== null)} />, root);
+  render(<App today={toIsoDate(new Date())} initial={withWarning} store={store} storage={storage} saveMarkdown={source === null} src={cardSrc(srcParam, source !== null)} loadError={loadError} />, root);
 };
 
 /** #data=<packed> (from File → Copy share link): the whole ledger carried in the link itself. Like ?src=, it is not autosaved. */
+/** What shows instead when a requested source fails, so nobody mistakes it for that source. */
+const fallback = read(STORAGE_KEYS.markdown) === null ? 'Showing the built-in sample decisions instead.' : 'Showing your saved file instead.';
 const dataParam = new URLSearchParams(location.hash.slice(1)).get('data');
 
 if (dataParam !== null) {
   unpackLedger(dataParam).then(
     (markdown) => boot({ url: 'The shared link', markdown }, null),
-    (e: unknown) => boot(null, `Could not open the shared link: ${e instanceof Error ? e.message : String(e)}. Showing your saved file instead.`)
+    (e: unknown) => boot(null, `Could not open the shared link: ${e instanceof Error ? e.message : String(e)}. ${fallback}`)
   );
 } else if (srcParam === null) boot(null, null);
 else {
   fetchText(srcParam).then(
     (r) => boot(r, null),
-    (e: unknown) => boot(null, `Could not load ${srcParam}: ${e instanceof Error ? e.message : String(e)}. Showing your saved file instead.`)
+    (e: unknown) => boot(null, `Could not load ${srcParam}: ${e instanceof Error ? e.message : String(e)}. ${fallback}`)
   );
 }
