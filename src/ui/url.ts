@@ -2,14 +2,14 @@
  * The address bar as state: which screen, record, chart and theme are showing. Pure — main.tsx reads
  * location and writes history; these functions only translate between query strings and state.
  *
- *   ?page=dashboard|markdown   ?layout=list|tree|sankey   ?adr=<id> (opens that record)   ?viz=matrix|radar|weighted|heatmap   ?theme=<id>
+ *   ?page=dashboard|markdown|card   ?layout=list|tree|sankey   ?adr=<id> (opens that record)   ?viz=matrix|radar|weighted|heatmap   ?theme=<id>
  *
  * Other params (such as ?src=) are left as they are. Unknown values are ignored.
  */
 import { LAYOUTS, VIZ, type LayoutId, type State, type VizId } from './state.ts';
 import { isThemeId, type ThemeId } from './themes.ts';
 
-export type UrlPage = { readonly kind: 'dashboard' } | { readonly kind: 'view'; readonly id: string } | { readonly kind: 'markdown' };
+export type UrlPage = { readonly kind: 'dashboard' } | { readonly kind: 'view'; readonly id: string } | { readonly kind: 'markdown' } | { readonly kind: 'card' };
 export interface UrlPrefs {
   readonly page?: UrlPage;
   readonly viz?: VizId;
@@ -27,7 +27,7 @@ export const fromQuery = (search: string): UrlPrefs => {
   const adr = (q.get('adr') ?? '').trim();
   const pageParam = q.get('page');
   const page: UrlPage | null =
-    adr !== '' ? { kind: 'view', id: adr } : pageParam === 'markdown' ? { kind: 'markdown' } : pageParam === 'dashboard' ? { kind: 'dashboard' } : null;
+    adr !== '' ? { kind: 'view', id: adr } : pageParam === 'markdown' ? { kind: 'markdown' } : pageParam === 'card' ? { kind: 'card' } : pageParam === 'dashboard' ? { kind: 'dashboard' } : null;
   const viz = q.get('viz');
   const theme = q.get('theme');
   const layout = q.get('layout');
@@ -46,6 +46,7 @@ export const toQuery = (s: State, search: string): string | null => {
   for (const k of ['page', 'adr', 'viz', 'theme', 'layout']) q.delete(k);
   if (s.screen.kind === 'view') q.set('adr', s.screen.id);
   if (s.screen.kind === 'markdown') q.set('page', 'markdown');
+  if (s.screen.kind === 'card') q.set('page', 'card');
   if (s.screen.kind === 'dashboard' && s.layout !== 'list') q.set('layout', s.layout);
   if (s.viz !== DEFAULT_VIZ) q.set('viz', s.viz);
   if (s.theme !== DEFAULT_THEME) q.set('theme', s.theme);
@@ -55,3 +56,10 @@ export const toQuery = (s: State, search: string): string | null => {
 
 /** Which screen a state is on, as a history key: a change here is a new history entry, anything else replaces it. */
 export const pageKey = (s: State): string => (s.screen.kind === 'view' ? `view:${s.screen.id}` : s.screen.kind);
+
+/** Where the card settings for a markdown URL live: decisions.md → decisions.card.json, keeping any ?query or #hash. */
+export const sidecarUrl = (src: string): string => {
+  const cut = src.search(/[?#]/);
+  const [path, rest] = cut === -1 ? [src, ''] : [src.slice(0, cut), src.slice(cut)];
+  return path.replace(/\.md$/i, '') + '.card.json' + rest;
+};

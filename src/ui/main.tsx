@@ -15,6 +15,7 @@ import { Dashboard } from './components/Dashboard.tsx';
 import { AdrView } from './components/AdrView.tsx';
 import { EditForm } from './components/EditForm.tsx';
 import { MarkdownView } from './components/MarkdownView.tsx';
+import { CardDesigner } from './components/CardDesigner.tsx';
 import { OpenDialog } from './components/OpenDialog.tsx';
 import { NewDialog } from './components/NewDialog.tsx';
 import { packLedger, unpackLedger } from '../core/share.ts';
@@ -148,6 +149,9 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
       break;
     case 'markdown':
       body = <MarkdownView md={state.md} focusId={s.focusId} sampleMarkdown={sampleMarkdown} storage={storage} dispatch={dispatch} fx={fx} />;
+      break;
+    case 'card':
+      body = <CardDesigner adrs={state.adrs} today={today} src={srcParam} store={store} save={saveMarkdown} dispatch={dispatch} fx={fx} />;
       break;
     default: {
       const never: never = s;

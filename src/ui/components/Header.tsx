@@ -42,6 +42,7 @@ const FileMenu = ({ adrs, dispatch, fx }: { adrs: readonly Adr[]; dispatch: Disp
         {item('upload', 'Open…', () => dispatch({ type: 'open/show' }))}
         {item('download', 'Download decisions.md', () => fx.download('decisions.md', serializeLedger(adrs)))}
         {item('copy', 'Copy share link', () => fx.share(serializeLedger(adrs)))}
+        {item('edit', 'Design card…', () => dispatch({ type: 'nav/card' }))}
       </div>
     </details>
   );

@@ -37,7 +37,8 @@ export type Screen =
       /** Form field id to open and focus first (e.g. "cn-ops", "sn-kafka", "f-goal"), or null for the top. */
       readonly focus: string | null;
     }
-  | { readonly kind: 'markdown'; readonly focusId: string | null };
+  | { readonly kind: 'markdown'; readonly focusId: string | null }
+  | { readonly kind: 'card' };
 
 export interface MarkdownPane {
   /** What is in the editor right now. */
@@ -177,6 +178,8 @@ export const applyPrefs = (s: State, p: UrlPrefs): State => {
       return reducer(styled, { type: 'nav/dashboard' });
     case 'markdown':
       return reducer(styled, { type: 'nav/markdown', focusId: null });
+    case 'card':
+      return reducer(styled, { type: 'nav/card' });
     case 'view': {
       const id = p.page.id;
       return styled.adrs.some((a) => a.id === id) ? reducer(styled, { type: 'nav/view', id }) : toast(reducer(styled, { type: 'nav/dashboard' }), 'error', `There is no record "${id}" in this file.`);
@@ -194,6 +197,7 @@ export type Action =
   | { type: 'nav/dashboard' }
   | { type: 'nav/view'; id: string }
   | { type: 'nav/markdown'; focusId: string | null }
+  | { type: 'nav/card' }
   | { type: 'theme/set'; theme: ThemeId }
   | { type: 'dash/query'; value: string }
   | { type: 'dash/filter'; filter: Filter }
@@ -256,6 +260,8 @@ export const reducer = (s: State, a: Action): State => {
       const adr = findAdr(s.adrs, a.id);
       return { ...s, screen: { kind: 'view', id: a.id }, expanded: firstOpen(adr), hidden: {} };
     }
+    case 'nav/card':
+      return { ...s, screen: { kind: 'card' } };
     case 'nav/markdown': {
       const clean = s.md.text === s.md.base;
       return { ...s, screen: { kind: 'markdown', focusId: a.focusId }, md: clean ? { ...s.md, error: null, notice: null } : s.md };

@@ -430,3 +430,26 @@ fieldset.field > legend { padding: 0; margin-bottom: 5px; }
 .tag-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .chip-sm { min-height: 34px; padding: 0 12px; font-size: 13px; }
 .menu-heading { padding: 10px 12px 4px; border-top: 1px solid var(--border-soft); margin-top: 4px; font: 600 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* Card designer (?page=card) */
+.cd-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 900px) { .cd-grid { grid-template-columns: 1fr; } }
+.cd-rows { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin: 0; min-width: 0; }
+.cd-row { display: grid; grid-template-columns: auto 120px minmax(0, 1fr) 44px minmax(0, 1fr); gap: 8px; align-items: center; }
+@media (max-width: 600px) { .cd-row { grid-template-columns: auto 1fr 44px; } .cd-row > .input { grid-column: 1 / -1; } }
+.cd-color { width: 44px; height: 44px; padding: 2px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--surface); }
+.cd-card { background: #fff; color: #16181D; border: 1px solid #E2E5EA; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.cd-card .muted { color: #555C68; }
+.cd-card a { color: #1F45B0; font-weight: 600; text-decoration: none; }
+.cd-title { font-size: 22px; }
+.cd-pill { border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.cd-good { background: #DDF1EC; color: #0B5A50; } .cd-warn { background: #F6ECD2; color: #6E5100; }
+.cd-bad { background: #F8E1E3; color: #7E1F2F; } .cd-neutral { background: #E6E8EA; color: #4D555C; }
+.cd-primary { font-size: 44px; font-weight: 800; line-height: 1; }
+.cd-heading { display: flex; align-items: baseline; gap: 10px; }
+.cd-bar { display: flex; gap: 4px; height: 8px; }
+.cd-bar > span { border-radius: 999px; background: #D5D9DE; }
+.cd-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; }
+.cd-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.cd-foot { border-top: 1px solid #E2E5EA; padding-top: 14px; }
+.cd-badge { align-self: flex-start; height: 20px; }
