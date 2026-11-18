@@ -208,8 +208,8 @@ The sidecar (every field optional):
   "title": "Decisions",
   "subtitle": "ADR log",
   "heading": { "primary": "total", "label": "decision records" },
-  "legend": [{ "id": "accepted", "label": "Accepted", "color": "#0B6B5F", "url": "https://…" }],
-  "source": { "label": "docs/adr/decisions.md", "url": "https://…" }
+  "legend": [{ "id": "accepted", "label": "Accepted", "color": "#0B6B5F" }],
+  "source": { "label": "docs/adr/decisions.md" }
 }
 ```
 
@@ -226,11 +226,11 @@ The sidecar (every field optional):
 {
   "version": 1,
   "title": "Decisions", "subtitle": "ADR log",
-  "status": { "label": "1 proposed", "tone": "neutral" },
+  "status": { "label": "1 proposed", "tone": "neutral", "url": "https://aaronp.github.io/adr/?src=…&status=proposed" },
   "heading": { "primary": "12", "label": "decision records" },
-  "legend": [{ "id": "accepted", "label": "Accepted", "color": "#0B6B5F" }],
+  "legend": [{ "id": "accepted", "label": "Accepted", "color": "#0B6B5F", "url": "https://aaronp.github.io/adr/?src=…&status=accepted" }],
   "report": { "accepted": 9 },
-  "source": { "label": "docs/adr/decisions.md" },
+  "source": { "label": "docs/adr/decisions.md", "url": "https://aaronp.github.io/adr/?src=…" },
   "updated": "2026-11-18"
 }
 ```
@@ -239,6 +239,11 @@ The sidecar (every field optional):
   `"N proposed"` / `neutral` when any are proposed, else `"Up to date"` / `good`. Tones are
   `good | warn | bad | neutral`; renderers choose the colours.
 - `heading.primary` is a string; `report` has a count for every legend item, zeros included.
+- Links are not part of the sidecar. `source.url` opens the viewer at `ADR_HOST` (default
+  `https://aaronp.github.io/adr/`) with `?src=` set to `ADR_SRC` (where the published markdown lives;
+  default the path given to the CLI). Each legend item adds `&status=<id>`, and the pill adds
+  `&status=revisit` or `&status=proposed`. The CLI reads both from the environment.
+- `?status=<status>|revisit` on the viewer opens the dashboard with that filter on.
 - The badge is a grey title segment, then one segment per legend item with a non-zero count.
 
 ## How the app saves

@@ -4,10 +4,9 @@
   "type": "module",
   "scripts": {
     "start": "bun index.ts",
-    "adr": "adr adr/decisions.md",
-    "badge": "adr badge adr/decisions.md && adr card adr/decisions.md"
+    "adr": "adr adr/decisions.md"
   },
   "devDependencies": {
-    "@pritzlaff/adr": "^1.0.0"
+    "@pritzlaff/adr": "^1.1.0"
   }
 }

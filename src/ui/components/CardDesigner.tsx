@@ -9,7 +9,7 @@ import { STATUSES } from '../../core/schema.ts';
 import { DEFAULT_COLORS, card, parsePrefs, type Card, type CardPrefs } from '../../core/card.ts';
 import { badgeSvg } from '../../core/badge.ts';
 import { STORAGE_KEYS, fetchText, type Store } from '../io.ts';
-import { safeHref, sidecarUrl } from '../url.ts';
+import { sidecarUrl } from '../url.ts';
 import { Icon, Kicker, type Dispatch, type Effects } from './common.tsx';
 
 interface Row {
@@ -17,7 +17,6 @@ interface Row {
   readonly on: boolean;
   readonly label: string;
   readonly color: string;
-  readonly url: string;
 }
 interface Design {
   readonly title: string;
@@ -27,13 +26,12 @@ interface Design {
   /** All five statuses, in legend order; `on` ones are shown. */
   readonly rows: readonly Row[];
   readonly sourceLabel: string;
-  readonly sourceUrl: string;
 }
 
-const DEFAULT_LABEL = Object.fromEntries(card([], {}, '', '').legend.map((l) => [l.id, l.label])) as Record<Status, string>;
+const DEFAULT_LABEL = Object.fromEntries(card([], {}, '', { label: '', src: '' }).legend.map((l) => [l.id, l.label])) as Record<Status, string>;
 
 const fromPrefs = (p: CardPrefs, sourceLabel: string): Design => {
-  const c = card([], p, '', sourceLabel);
+  const c = card([], p, '', { label: sourceLabel, src: sourceLabel });
   const listed: NonNullable<CardPrefs['legend']> = p.legend ?? STATUSES.map((id) => ({ id }));
   const ids = [...listed.map((l) => l.id), ...STATUSES.filter((s) => !listed.some((l) => l.id === s))];
   return {
@@ -43,10 +41,9 @@ const fromPrefs = (p: CardPrefs, sourceLabel: string): Design => {
     label: c.heading.label,
     rows: ids.map((id) => {
       const l = listed.find((x) => x.id === id);
-      return { id, on: l !== undefined, label: l?.label ?? DEFAULT_LABEL[id], color: l?.color ?? DEFAULT_COLORS[id], url: l?.url ?? '' };
+      return { id, on: l !== undefined, label: l?.label ?? DEFAULT_LABEL[id], color: l?.color ?? DEFAULT_COLORS[id] };
     }),
-    sourceLabel: c.source.label,
-    sourceUrl: c.source.url ?? ''
+    sourceLabel: c.source.label
   };
 };
 
@@ -54,8 +51,8 @@ const toPrefs = (d: Design): CardPrefs => ({
   title: d.title,
   subtitle: d.subtitle,
   heading: { primary: d.primary, label: d.label },
-  legend: d.rows.filter((r) => r.on).map((r) => ({ id: r.id, label: r.label, color: r.color, ...(r.url !== '' ? { url: r.url } : {}) })),
-  source: { label: d.sourceLabel, ...(d.sourceUrl !== '' ? { url: d.sourceUrl } : {}) }
+  legend: d.rows.filter((r) => r.on).map((r) => ({ id: r.id, label: r.label, color: r.color })),
+  source: { label: d.sourceLabel }
 });
 
 /** The design as last edited, kept while the page is open so leaving the designer and coming back keeps unsaved edits. */
@@ -74,7 +71,13 @@ const CardPreview = ({ c }: { c: Card }) => {
           <strong class="cd-title">{c.title}</strong>
           {c.subtitle !== '' ? <span class="muted">{c.subtitle}</span> : null}
         </div>
-        <span class={`cd-pill ${TONE[c.status.tone]}`}>{c.status.label}</span>
+        {c.status.url !== undefined ? (
+          <a class={`cd-pill ${TONE[c.status.tone]}`} href={c.status.url}>
+            {c.status.label}
+          </a>
+        ) : (
+          <span class={`cd-pill ${TONE[c.status.tone]}`}>{c.status.label}</span>
+        )}
       </div>
       <div class="cd-heading">
         <span class="cd-primary">{c.heading.primary}</span> <span class="muted">{c.heading.label}</span>
@@ -83,13 +86,13 @@ const CardPreview = ({ c }: { c: Card }) => {
       <div class="cd-legend">
         {items.map((i) => (
           <span key={i.id} class="row-xs">
-            <span class="cd-swatch" style={{ background: i.color }} /> {safeHref(i.url) !== undefined ? <a href={safeHref(i.url)}>{i.label}</a> : i.label} <strong>{i.n}</strong>
+            <span class="cd-swatch" style={{ background: i.color }} /> {i.url !== undefined ? <a href={i.url}>{i.label}</a> : i.label} <strong>{i.n}</strong>
           </span>
         ))}
       </div>
       <div class="row-between cd-foot">
         <span class="mono small">{c.source.label}</span>
-        {safeHref(c.source.url) !== undefined ? <a href={safeHref(c.source.url)}>Open →</a> : <span class="muted">Open →</span>}
+        {c.source.url !== undefined ? <a href={c.source.url}>Open →</a> : <span class="muted">Open →</span>}
       </div>
     </div>
   );
@@ -170,7 +173,8 @@ export const CardDesigner = ({ adrs, today, src, store, save, dispatch, fx }: { 
     set({ rows });
   };
   const prefs = toPrefs(design);
-  const c = card(adrs, prefs, today, defaultSource);
+  /* Links open the hosted viewer (ADR_HOST) on this file, so ?src is made absolute. */
+  const c = card(adrs, prefs, today, { label: defaultSource, src: src === null ? defaultSource : new URL(src, location.href).href });
   const svg = badgeSvg(c);
   const fileName = `${defaultSource.split(/[/?#]/).filter((s) => s !== '').find((s) => /\.md$/i.test(s))?.replace(/\.md$/i, '') ?? 'decisions'}.card.json`;
   const text = (label: string, value: string, on: (v: string) => void, mono = false) => (
@@ -231,13 +235,11 @@ export const CardDesigner = ({ adrs, today, src, store, save, dispatch, fx }: { 
                 </label>
                 <input class="input" aria-label={`${r.id} label`} value={r.label} onInput={(e) => setRow(i, { label: e.currentTarget.value })} />
                 <input type="color" class="cd-color" aria-label={`${r.id} colour`} value={r.color} onInput={(e) => setRow(i, { color: e.currentTarget.value.toUpperCase() })} />
-                <input class="input" aria-label={`${r.id} link`} placeholder="Link (optional)" value={r.url} onInput={(e) => setRow(i, { url: e.currentTarget.value })} />
               </div>
             ))}
           </fieldset>
           <div class="row-fields">
             <div class="grow-main">{text('Source path', design.sourceLabel, (v) => set({ sourceLabel: v }), true)}</div>
-            <div class="grow-main">{text('Open link', design.sourceUrl, (v) => set({ sourceUrl: v }))}</div>
           </div>
         </div>
         <div class="stack-s">

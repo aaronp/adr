@@ -4,6 +4,8 @@
 // adr card <decisions.md> [out-dir]: writes card.json, the ledger as a dashboard card (out-dir defaults to the file's folder).
 // adr badge <decisions.md> [out-dir]: writes badge.svg, drawn from the same card.
 // Both read the optional sidecar <name>.card.json beside the markdown (titles, legend labels, colours).
+// The card's links open the viewer at ADR_HOST (default https://aaronp.github.io/adr/) with ?src=ADR_SRC,
+// where ADR_SRC is where the published markdown lives (default: the path given, relative to ADR_HOST).
 import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
@@ -28,7 +30,7 @@ if (cmd === 'card' || cmd === 'badge') {
     if (e.code !== 'ENOENT') fail(sidecar, e);
   }
   try {
-    const c = card(parseLedger(await readFile(md, 'utf8')), prefs, new Date().toLocaleDateString('en-CA'), md);
+    const c = card(parseLedger(await readFile(md, 'utf8')), prefs, new Date().toLocaleDateString('en-CA'), { label: md, src: process.env.ADR_SRC || md }, process.env.ADR_HOST || undefined);
     const [name, body] = cmd === 'card' ? ['card.json', JSON.stringify(c, null, 2) + '\n'] : ['badge.svg', badgeSvg(c)];
     await writeFile(join(out, name), body);
     console.log(`Wrote ${join(out, name)}`);

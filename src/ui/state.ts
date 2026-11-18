@@ -171,7 +171,7 @@ const createStartState = (input: InitInput): State => {
 
 /** Applies address-bar prefs. A file that failed to load stays on its error; an unknown record id is reported, not guessed. */
 export const applyPrefs = (s: State, p: UrlPrefs): State => {
-  const styled = { ...s, ...(p.theme !== undefined ? { theme: p.theme } : {}), ...(p.viz !== undefined ? { viz: p.viz } : {}), ...(p.layout !== undefined ? { layout: p.layout } : {}) };
+  const styled = { ...s, ...(p.filter !== undefined ? { filter: p.filter } : {}), ...(p.theme !== undefined ? { theme: p.theme } : {}), ...(p.viz !== undefined ? { viz: p.viz } : {}), ...(p.layout !== undefined ? { layout: p.layout } : {}) };
   if (p.page === undefined || (s.screen.kind === 'markdown' && s.md.error !== null)) return styled;
   switch (p.page.kind) {
     case 'dashboard':

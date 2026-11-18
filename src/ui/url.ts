@@ -2,11 +2,12 @@
  * The address bar as state: which screen, record, chart and theme are showing. Pure — main.tsx reads
  * location and writes history; these functions only translate between query strings and state.
  *
- *   ?page=dashboard|markdown|card   ?layout=list|tree|sankey   ?adr=<id> (opens that record)   ?viz=matrix|radar|weighted|heatmap   ?theme=<id>
+ *   ?page=dashboard|markdown|card   ?status=<status>|revisit (dashboard filter)   ?layout=list|tree|sankey   ?adr=<id> (opens that record)   ?viz=matrix|radar|weighted|heatmap   ?theme=<id>
  *
  * Other params (such as ?src=) are left as they are. Unknown values are ignored.
  */
 import { LAYOUTS, VIZ, type LayoutId, type State, type VizId } from './state.ts';
+import { FILTERS, type Filter } from '../core/search.ts';
 import { isThemeId, type ThemeId } from './themes.ts';
 
 export type UrlPage = { readonly kind: 'dashboard' } | { readonly kind: 'view'; readonly id: string } | { readonly kind: 'markdown' } | { readonly kind: 'card' };
@@ -15,6 +16,8 @@ export interface UrlPrefs {
   readonly viz?: VizId;
   readonly layout?: LayoutId;
   readonly theme?: ThemeId;
+  /** Dashboard filter (?status=): a status, or "revisit" for revisits due. */
+  readonly filter?: Filter;
 }
 
 const DEFAULT_VIZ: VizId = 'radar';
@@ -31,7 +34,9 @@ export const fromQuery = (search: string): UrlPrefs => {
   const viz = q.get('viz');
   const theme = q.get('theme');
   const layout = q.get('layout');
+  const status = q.get('status');
   return {
+    ...(status !== null && (FILTERS as readonly string[]).includes(status) && status !== 'all' ? { filter: status as Filter } : {}),
     ...(layout !== null && isLayoutId(layout) ? { layout } : {}),
     ...(page !== null ? { page } : {}),
     ...(viz !== null && isVizId(viz) ? { viz } : {}),
@@ -43,11 +48,12 @@ export const fromQuery = (search: string): UrlPrefs => {
 export const toQuery = (s: State, search: string): string | null => {
   if (s.screen.kind === 'edit') return null;
   const q = new URLSearchParams(search);
-  for (const k of ['page', 'adr', 'viz', 'theme', 'layout']) q.delete(k);
+  for (const k of ['page', 'adr', 'viz', 'theme', 'layout', 'status']) q.delete(k);
   if (s.screen.kind === 'view') q.set('adr', s.screen.id);
   if (s.screen.kind === 'markdown') q.set('page', 'markdown');
   if (s.screen.kind === 'card') q.set('page', 'card');
   if (s.screen.kind === 'dashboard' && s.layout !== 'list') q.set('layout', s.layout);
+  if (s.screen.kind === 'dashboard' && s.filter !== 'all') q.set('status', s.filter);
   if (s.viz !== DEFAULT_VIZ) q.set('viz', s.viz);
   if (s.theme !== DEFAULT_THEME) q.set('theme', s.theme);
   const out = q.toString().replace(/%2F/gi, '/').replace(/%3A/gi, ':');
@@ -62,16 +68,6 @@ export const sidecarUrl = (src: string): string => {
   const cut = src.search(/[?#]/);
   const [path, rest] = cut === -1 ? [src, ''] : [src.slice(0, cut), src.slice(cut)];
   return path.replace(/\.md$/i, '') + '.card.json' + rest;
-};
-
-/** A card link that is safe to put in an href: http(s) or a relative path. Anything else (javascript:, data:) is dropped. */
-export const safeHref = (u: string | undefined): string | undefined => {
-  if (u === undefined) return undefined;
-  try {
-    return ['http:', 'https:'].includes(new URL(u, 'https://relative.invalid/').protocol) ? u : undefined;
-  } catch {
-    return undefined;
-  }
 };
 
 /** The ?src the card designer should read its sidecar beside: only when that file is what is showing (it loaded). */

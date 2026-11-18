@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialState, reducer, type State } from '../src/ui/state.ts';
-import { cardSrc, fromQuery, pageKey, safeHref, sidecarUrl, toQuery } from '../src/ui/url.ts';
+import { cardSrc, fromQuery, pageKey, sidecarUrl, toQuery } from '../src/ui/url.ts';
 import { parseLedger } from '../src/core/markdown.ts';
 import { readSample } from './helpers.ts';
 
@@ -69,13 +69,15 @@ test('the sidecar sits beside the markdown', () => {
   assert.equal(sidecarUrl('notes'), 'notes.card.json');
 });
 
-test('card links only allow web addresses', () => {
-  assert.equal(safeHref('https://x.org/a'), 'https://x.org/a');
-  assert.equal(safeHref('docs/adr/'), 'docs/adr/');
-  assert.equal(safeHref('javascript:alert(1)'), undefined);
-  assert.equal(safeHref(' JavaScript:alert(1)'), undefined);
-  assert.equal(safeHref('data:text/html,<b>x</b>'), undefined);
-  assert.equal(safeHref(undefined), undefined);
+test('?status= picks the dashboard filter', () => {
+  assert.deepEqual(fromQuery('?status=proposed'), { filter: 'proposed' });
+  assert.deepEqual(fromQuery('?status=revisit'), { filter: 'revisit' });
+  assert.deepEqual(fromQuery('?status=nope'), {});
+  assert.equal(start('?status=accepted').filter, 'accepted');
+  const s = reducer(start('?src=d.md'), { type: 'dash/filter', filter: 'revisit' });
+  assert.equal(toQuery(s, '?src=d.md'), '?src=d.md&status=revisit');
+  assert.equal(toQuery(reducer(s, { type: 'dash/filter', filter: 'all' }), '?src=d.md'), '?src=d.md');
+  assert.equal(reducer(start(''), { type: 'url/apply', prefs: { filter: 'proposed' } }).filter, 'proposed');
 });
 
 test('the designer reads the sidecar beside ?src only when ?src actually loaded', () => {

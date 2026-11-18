@@ -84,8 +84,11 @@ adr badge decisions.md [out-dir]   # → badge.svg: drawn from the same card
 a dashboard to style as it likes; see [spec.md](spec.md#card-and-badge). What it says (titles, legend
 labels, colours, order) comes from an optional `decisions.card.json` beside the markdown. Design one in
 the viewer with **File → Design card…** (`?page=card`), which previews the card and badge and downloads
-the file. The Pages workflows here and in both examples regenerate both on every push, so a README can
-embed the live badge:
+the file. Links in the card open the viewer at `ADR_HOST` (default `https://aaronp.github.io/adr/`) on
+`ADR_SRC` (where your published markdown lives), filtered with `?status=proposed|accepted|…|revisit`; set
+both as environment variables. The Pages workflows here and in both examples regenerate both files on
+every push (in [examples/bun-app](examples/bun-app) it is `make snapshot`), so a README can embed the
+live badge:
 
 ```md
 [![Decisions](https://you.github.io/your-decisions/badge.svg)](https://you.github.io/your-decisions/)

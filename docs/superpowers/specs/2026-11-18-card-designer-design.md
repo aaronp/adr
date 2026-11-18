@@ -170,3 +170,12 @@ Optional; every field optional and defaulted.
 - Reorder control (buttons vs drag), exact preview styling, default palette values beyond the paper theme.
 - Whether the sidecar shape is a strict subset of `card.json` types or its own schema.
 - `spec.md` section wording for the sidecar and `card.json`.
+
+## Revision (2026-11-18): links are generated, not designed
+
+Per the user, card links are not user-specified. `ADR_HOST` (constant in `src/core/card.ts`, default
+`https://aaronp.github.io/adr/`, CLI env override) plus `?src=<ADR_SRC>` opens the viewer on the published
+markdown; legend items add `&status=<id>`, the pill adds `&status=revisit|proposed`. The sidecar no longer
+has `url` fields (they are rejected), and the designer has no link inputs. The viewer gains
+`?status=<status>|revisit`, which sets (and is kept in sync with) the dashboard filter. The bun-app example
+gets `make snapshot` (badge.svg + card.json), deriving `ADR_SRC` from the `origin` remote.

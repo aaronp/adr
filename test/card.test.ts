@@ -3,17 +3,18 @@ import assert from 'node:assert/strict';
 import { Value } from '@sinclair/typebox/value';
 import { parseLedger } from '../src/core/markdown.ts';
 import { STATUSES, type Adr } from '../src/core/schema.ts';
-import { CardSchema, DEFAULT_COLORS, card, parsePrefs } from '../src/core/card.ts';
+import { ADR_HOST, CardSchema, DEFAULT_COLORS, card, parsePrefs } from '../src/core/card.ts';
 import { badgeSvg } from '../src/core/badge.ts';
 import { readSample } from './helpers.ts';
 
 const TODAY = '2026-10-24';
 const sample = () => parseLedger(readSample());
+const at = (p: string) => ({ label: p, src: p });
 const calm = (): Adr[] => sample().map((a) => ({ ...a, status: 'accepted', revisit: null }));
 
 test('card defaults', () => {
   const adrs = sample();
-  const c = card(adrs, {}, TODAY, 'decisions.md');
+  const c = card(adrs, {}, TODAY, at('decisions.md'));
   assert.equal(c.version, 1);
   assert.equal(c.title, 'Decisions');
   assert.equal(c.subtitle, 'ADR log');
@@ -23,7 +24,7 @@ test('card defaults', () => {
   for (const l of c.legend) assert.equal(l.color, DEFAULT_COLORS[l.id as keyof typeof DEFAULT_COLORS]);
   assert.deepEqual(Object.keys(c.report).sort(), [...STATUSES].sort());
   assert.equal(Object.values(c.report).reduce((a, b) => a + b, 0), adrs.length);
-  assert.deepEqual(c.source, { label: 'decisions.md' });
+  assert.deepEqual(c.source, { label: 'decisions.md', url: `${ADR_HOST}?src=decisions.md` });
   assert.equal(c.updated, TODAY);
   assert.ok(Value.Check(CardSchema, c));
 });
@@ -38,35 +39,48 @@ test('card prefs override defaults', () => {
       subtitle: 'ADRs',
       heading: { primary: 'accepted', label: 'accepted' },
       legend: [{ id: 'proposed', label: 'Open' }, { id: 'accepted' }],
-      source: { label: 'docs/adr.md', url: 'https://x/' }
+      source: { label: 'docs/adr.md' }
     },
     TODAY,
-    'decisions.md'
+    at('decisions.md')
   );
   assert.equal(c.title, 'Choices');
   assert.equal(c.subtitle, 'ADRs');
   assert.deepEqual(c.heading, { primary: String(accepted), label: 'accepted' });
-  assert.deepEqual(c.legend, [
+  assert.deepEqual(c.legend.map(({ url, ...l }) => l), [
     { id: 'proposed', label: 'Open', color: DEFAULT_COLORS.proposed },
     { id: 'accepted', label: 'Accepted', color: DEFAULT_COLORS.accepted }
   ]);
   assert.deepEqual(Object.keys(c.report), ['proposed', 'accepted']);
-  assert.deepEqual(c.source, { label: 'docs/adr.md', url: 'https://x/' });
+  assert.equal(c.source.label, 'docs/adr.md');
 });
 
 test('card pill: due beats proposed beats up to date', () => {
   const due = calm().map((a, i) => (i === 0 ? { ...a, revisit: TODAY } : a));
-  assert.deepEqual(card(due, {}, TODAY, 'd.md').status, { label: '1 due', tone: 'bad' });
+  assert.deepEqual(card(due, {}, TODAY, at('d.md')).status, { label: '1 due', tone: 'bad', url: `${ADR_HOST}?src=d.md&status=revisit` });
   const proposed = calm().map((a, i) => (i < 2 ? { ...a, status: 'proposed' as const } : a));
-  assert.deepEqual(card(proposed, {}, TODAY, 'd.md').status, { label: '2 proposed', tone: 'neutral' });
-  assert.deepEqual(card(calm(), {}, TODAY, 'd.md').status, { label: 'Up to date', tone: 'good' });
+  assert.deepEqual(card(proposed, {}, TODAY, at('d.md')).status, { label: '2 proposed', tone: 'neutral', url: `${ADR_HOST}?src=d.md&status=proposed` });
+  assert.deepEqual(card(calm(), {}, TODAY, at('d.md')).status, { label: 'Up to date', tone: 'good' });
 });
 
 test('card of an empty ledger', () => {
-  const c = card([], {}, TODAY, 'x.md');
+  const c = card([], {}, TODAY, at('x.md'));
   assert.equal(c.heading.primary, '0');
   assert.ok(Object.values(c.report).every((n) => n === 0));
   assert.deepEqual(c.status, { label: 'Up to date', tone: 'good' });
+});
+
+test('card links open the hosted viewer on that file, filtered', () => {
+  const c = card(sample(), {}, TODAY, { label: 'decisions.md', src: 'https://you.github.io/d/decisions.md' }, 'https://host.example/adr/');
+  const src = 'src=https://you.github.io/d/decisions.md';
+  assert.equal(c.source.url, `https://host.example/adr/?${src}`);
+  assert.equal(c.legend.find((l) => l.id === 'accepted')?.url, `https://host.example/adr/?${src}&status=accepted`);
+  assert.equal(card([], {}, TODAY, { label: 'a b.md', src: 'a b.md?x=1&y' }).source.url, `${ADR_HOST}?src=a%20b.md%3Fx%3D1%26y`);
+});
+
+test('card settings no longer carry links', () => {
+  assert.throws(() => parsePrefs({ source: { url: 'https://x/' } }));
+  assert.throws(() => parsePrefs({ legend: [{ id: 'accepted', url: 'https://x/' }] }));
 });
 
 test('parsePrefs drops unknown legend ids with a warning', () => {
@@ -81,7 +95,7 @@ test('parsePrefs rejects a bad shape', () => {
   assert.throws(() => parsePrefs({ heading: { primary: 'nope' } }));
 });
 
-const base = card([], { legend: [{ id: 'accepted' }, { id: 'proposed' }, { id: 'superseded' }] }, TODAY, 'd.md');
+const base = card([], { legend: [{ id: 'accepted' }, { id: 'proposed' }, { id: 'superseded' }] }, TODAY, at('d.md'));
 const withReport = (report: Record<string, number>) => ({ ...base, report });
 
 test('badge: title then one segment per non-zero legend item', () => {

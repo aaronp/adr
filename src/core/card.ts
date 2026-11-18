@@ -2,12 +2,16 @@
  * A dashboard card for the ledger, as data (card.json): title, a status pill, one big number, and a
  * legend with a count per item. The format is tool-neutral; only `card()` below knows about ADRs.
  * What the card says (titles, legend labels, colours, order) comes from an optional sidecar file,
- * `<name>.card.json`, read with `parsePrefs`.
+ * `<name>.card.json`, read with `parsePrefs`. Links are not designed: they open the hosted viewer
+ * (ADR_HOST) on the markdown, filtered with ?status= to the item clicked.
  */
 import { Type, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { STATUSES, type Adr, type Status } from './schema.ts';
 import { isRevisitDue } from './search.ts';
+
+/** The hosted viewer the card's links open. The CLI takes ADR_HOST from the environment to point elsewhere. */
+export const ADR_HOST = 'https://aaronp.github.io/adr/';
 
 const Link = Type.Object({ label: Type.String(), url: Type.Optional(Type.String()) }, { additionalProperties: false });
 
@@ -17,7 +21,7 @@ export const CardSchema = Type.Object(
     version: Type.Literal(1),
     title: Type.String(),
     subtitle: Type.String(),
-    status: Type.Object({ label: Type.String(), tone: Type.Union([Type.Literal('good'), Type.Literal('warn'), Type.Literal('bad'), Type.Literal('neutral')]) }),
+    status: Type.Object({ label: Type.String(), tone: Type.Union([Type.Literal('good'), Type.Literal('warn'), Type.Literal('bad'), Type.Literal('neutral')]), url: Type.Optional(Type.String()) }),
     heading: Type.Object({ primary: Type.String(), label: Type.String() }),
     legend: Type.Array(
       Type.Object({ id: Type.String(), label: Type.String(), color: Type.Optional(Type.String()), url: Type.Optional(Type.String()) }, { additionalProperties: false })
@@ -39,9 +43,9 @@ export const CardPrefsSchema = Type.Object(
     subtitle: Type.Optional(Type.String()),
     heading: Type.Optional(Type.Object({ primary: Type.Optional(Type.Union([Type.Literal('total'), StatusId])), label: Type.Optional(Type.String()) }, { additionalProperties: false })),
     legend: Type.Optional(
-      Type.Array(Type.Object({ id: StatusId, label: Type.Optional(Type.String()), color: Type.Optional(Type.String()), url: Type.Optional(Type.String()) }, { additionalProperties: false }))
+      Type.Array(Type.Object({ id: StatusId, label: Type.Optional(Type.String()), color: Type.Optional(Type.String()) }, { additionalProperties: false }))
     ),
-    source: Type.Optional(Type.Object({ label: Type.Optional(Type.String()), url: Type.Optional(Type.String()) }, { additionalProperties: false }))
+    source: Type.Optional(Type.Object({ label: Type.Optional(Type.String()) }, { additionalProperties: false }))
   },
   { additionalProperties: false }
 );
@@ -79,28 +83,33 @@ export const parsePrefs = (json: unknown): { prefs: CardPrefs; warnings: string[
   return { prefs: input, warnings };
 };
 
-export const card = (adrs: readonly Adr[], prefs: CardPrefs, today: string, sourceLabel: string): Card => {
+/**
+ * `at.label` is the default source label (the markdown path); `at.src` is where the viewer can fetch the
+ * markdown (?src=), a URL or a path relative to `host`.
+ */
+export const card = (adrs: readonly Adr[], prefs: CardPrefs, today: string, at: { readonly label: string; readonly src: string }, host: string = ADR_HOST): Card => {
+  const open = `${host}?src=${encodeURIComponent(at.src).replace(/%2F/gi, '/').replace(/%3A/gi, ':')}`;
+  const filtered = (f: Status | 'revisit') => `${open}&status=${f}`;
   const count = (s: Status): number => adrs.filter((a) => a.status === s).length;
   const items: NonNullable<CardPrefs['legend']> = prefs.legend ?? STATUSES.map((id) => ({ id }));
-  const legend = items.map((l) => ({
-    id: l.id,
-    label: l.label ?? capitalise(l.id),
-    color: l.color ?? DEFAULT_COLORS[l.id],
-    ...(l.url !== undefined ? { url: l.url } : {})
-  }));
+  const legend = items.map((l) => ({ id: l.id, label: l.label ?? capitalise(l.id), color: l.color ?? DEFAULT_COLORS[l.id], url: filtered(l.id) }));
   const primary = prefs.heading?.primary ?? 'total';
   const due = adrs.filter((a) => isRevisitDue(a, today)).length;
   const proposed = count('proposed');
-  const url = prefs.source?.url;
   return {
     version: 1,
     title: prefs.title ?? 'Decisions',
     subtitle: prefs.subtitle ?? 'ADR log',
-    status: due > 0 ? { label: `${due} due`, tone: 'bad' } : proposed > 0 ? { label: `${proposed} proposed`, tone: 'neutral' } : { label: 'Up to date', tone: 'good' },
+    status:
+      due > 0
+        ? { label: `${due} due`, tone: 'bad', url: filtered('revisit') }
+        : proposed > 0
+          ? { label: `${proposed} proposed`, tone: 'neutral', url: filtered('proposed') }
+          : { label: 'Up to date', tone: 'good' },
     heading: { primary: String(primary === 'total' ? adrs.length : count(primary)), label: prefs.heading?.label ?? 'decision records' },
     legend,
     report: Object.fromEntries(legend.map((l) => [l.id, count(l.id)])),
-    source: { label: prefs.source?.label ?? sourceLabel, ...(url !== undefined ? { url } : {}) },
+    source: { label: prefs.source?.label ?? at.label, url: open },
     updated: today
   };
 };
