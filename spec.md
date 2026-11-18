@@ -195,6 +195,58 @@ line:
 - a `parent` that is not a record in the file, is the record itself, or would make a loop;
 - text before the first record's `---`.
 
+## Card and badge
+
+`adr card decisions.md` writes `card.json`, a tool-neutral summary for dashboards; `adr badge` draws
+`badge.svg` from the same data. Both read an optional sidecar, `decisions.card.json` (the markdown's
+name with `.md` replaced by `.card.json`), which the viewer's **File → Design card…** edits.
+
+The sidecar (every field optional):
+
+```json
+{
+  "title": "Decisions",
+  "subtitle": "ADR log",
+  "heading": { "primary": "total", "label": "decision records" },
+  "legend": [{ "id": "accepted", "label": "Accepted", "color": "#0B6B5F" }],
+  "source": { "label": "docs/adr/decisions.md" }
+}
+```
+
+- `heading.primary`: `total` (all records) or a status, whose count becomes the big number.
+- `hideZero`: `true` leaves legend items with no records out of the card (default `false`).
+- `legend`: which statuses to show, in order. Ids must be statuses; an unknown id is an error for the
+  CLI and is dropped with a warning in the viewer.
+- Defaults: the values above, all five statuses with these colours — proposed `#1F45B0`, accepted
+  `#0B6B5F`, superseded `#6B7280`, deprecated `#B26B00`, rejected `#A3283C` — and `source.label` = the
+  markdown path.
+
+`card.json` (version 1) is the sidecar with defaults filled in, plus what is computed:
+
+```json
+{
+  "version": 1,
+  "title": "Decisions", "subtitle": "ADR log",
+  "status": { "label": "1 proposed", "tone": "neutral", "url": "https://aaronp.github.io/adr/?src=…&status=proposed" },
+  "heading": { "primary": "12", "label": "decision records" },
+  "legend": [{ "id": "accepted", "label": "Accepted", "color": "#0B6B5F", "url": "https://aaronp.github.io/adr/?src=…&status=accepted" }],
+  "report": { "accepted": 9 },
+  "source": { "label": "docs/adr/decisions.md", "url": "https://aaronp.github.io/adr/?src=…" },
+  "updated": "2026-11-18"
+}
+```
+
+- `status` (the pill): `"N due"` / `bad` when any revisit is due (overdue or within 30 days), else
+  `"N proposed"` / `neutral` when any are proposed, else `"Up to date"` / `good`. Tones are
+  `good | warn | bad | neutral`; renderers choose the colours.
+- `heading.primary` is a string; `report` has a count for every legend item, zeros included.
+- Links are not part of the sidecar. `source.url` opens the viewer at `ADR_HOST` (default
+  `https://aaronp.github.io/adr/`) with `?src=` set to `ADR_SRC` (where the published markdown lives;
+  default the path given to the CLI). Each legend item adds `&status=<id>`, and the pill adds
+  `&status=revisit` or `&status=proposed`. The CLI reads both from the environment.
+- `?status=<status>|revisit` on the viewer opens the dashboard with that filter on.
+- The badge is a grey title segment, then one segment per legend item with a non-zero count.
+
 ## How the app saves
 
 When the app saves (or "tidies") a file, it writes every record in the

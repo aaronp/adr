@@ -8,29 +8,24 @@ import sampleMarkdown from '../sample/decisions.md';
 import { formatDate, toIsoDate } from '../core/dates.ts';
 import { serializeLedger } from '../core/markdown.ts';
 import { createInitialState, reducer, type State } from './state.ts';
-import { fromQuery, pageKey, toQuery } from './url.ts';
+import { cardSrc, fromQuery, pageKey, toQuery } from './url.ts';
 import { STORAGE_KEYS, copyText, createBrowserStore, downloadText, fetchText, readTextFile, type Store } from './io.ts';
 import { Header } from './components/Header.tsx';
 import { Dashboard } from './components/Dashboard.tsx';
 import { AdrView } from './components/AdrView.tsx';
 import { EditForm } from './components/EditForm.tsx';
 import { MarkdownView } from './components/MarkdownView.tsx';
+import { CardDesigner } from './components/CardDesigner.tsx';
 import { OpenDialog } from './components/OpenDialog.tsx';
 import { NewDialog } from './components/NewDialog.tsx';
 import { packLedger, unpackLedger } from '../core/share.ts';
-import { badgeSvg } from '../core/badge.ts';
-
-/** The badge in the current theme's colours, read from the page's CSS variables. */
-const themedBadge = (adrs: State['adrs'], today: string): string => {
-  const css = getComputedStyle(document.documentElement);
-  const v = (name: string) => css.getPropertyValue(name).trim();
-  return badgeSvg(adrs, today, { accepted: v('--good'), proposed: v('--accent'), due: v('--bad'), text: v('--surface') });
-};
 import type { Effects } from './components/common.tsx';
 
 interface AppProps {
   /** Whether to autosave the records in this browser. Off when they came from ?src=, so a shared file never overwrites local work. */
   readonly saveMarkdown: boolean;
+  /** The ?src the ledger was loaded from, or null (saved file, sample or share link). */
+  readonly src: string | null;
   /** Calendar day used for every "revisit due" calculation. Injected so the UI is deterministic. */
   readonly today: string;
   readonly initial: State;
@@ -38,7 +33,7 @@ interface AppProps {
   readonly storage: { available: true } | { available: false; reason: string };
 }
 
-const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
+const App = ({ today, initial, store, storage, saveMarkdown, src }: AppProps) => {
   const [state, dispatch] = useReducer(reducer, initial);
 
   // Persist applied records (not unapplied editor text) and the theme.
@@ -157,6 +152,9 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
     case 'markdown':
       body = <MarkdownView md={state.md} focusId={s.focusId} sampleMarkdown={sampleMarkdown} storage={storage} dispatch={dispatch} fx={fx} />;
       break;
+    case 'card':
+      body = <CardDesigner adrs={state.adrs} today={today} src={src} store={store} save={saveMarkdown} dispatch={dispatch} fx={fx} />;
+      break;
     default: {
       const never: never = s;
       throw new Error(`bug: unknown screen ${JSON.stringify(never)}`);
@@ -165,7 +163,7 @@ const App = ({ today, initial, store, storage, saveMarkdown }: AppProps) => {
 
   return (
     <div class="app">
-      <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} adrs={state.adrs} badge={() => themedBadge(state.adrs, today)} dispatch={dispatch} fx={fx} />
+      <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} adrs={state.adrs} dispatch={dispatch} fx={fx} />
       {body}
       {state.openDialog ? <OpenDialog dispatch={dispatch} fx={fx} /> : null}
       {state.newDialog ? <NewDialog count={state.adrs.length} onDownload={() => fx.download('decisions.md', serializeLedger(state.adrs))} dispatch={dispatch} /> : null}
@@ -194,7 +192,7 @@ const boot = (source: { url: string; markdown: string } | null, loadError: strin
   const initial = createInitialState({ source, storedMarkdown: read(STORAGE_KEYS.markdown), storedTheme: read(STORAGE_KEYS.theme), sampleMarkdown, prefs: fromQuery(location.search) });
   const warning = loadError ?? (browser.available ? null : 'This browser is blocking storage, so nothing will be remembered. Download decisions.md to keep your work.');
   const withWarning: State = warning === null ? initial : { ...initial, seq: initial.seq + 1, toast: { id: initial.seq, kind: 'error', text: warning } };
-  render(<App today={toIsoDate(new Date())} initial={withWarning} store={store} storage={storage} saveMarkdown={source === null} />, root);
+  render(<App today={toIsoDate(new Date())} initial={withWarning} store={store} storage={storage} saveMarkdown={source === null} src={cardSrc(srcParam, source !== null)} />, root);
 };
 
 /** #data=<packed> (from File → Copy share link): the whole ledger carried in the link itself. Like ?src=, it is not autosaved. */

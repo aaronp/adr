@@ -1,42 +1,31 @@
 /**
- * A GitHub-style status badge for the ledger, as a standalone SVG:
+ * A GitHub-style status badge drawn from a card (see card.ts), as a standalone SVG:
  *
- *   ( A: 3 ✅ | P: 2 ⏳ | D: 1 ⚠️ )
+ *   ( Decisions | Accepted 9 | Proposed 1 )
  *
- * accepted, proposed, and revisits due (overdue or within 30 days). Colours are passed in (the page's theme),
- * so the badge matches the ledger it came from.
+ * A grey title segment, then one segment per legend item with a non-zero count, on that item's colour.
+ * Reads only card.json fields, so it works for any tool's card.
  */
-import type { Adr } from './schema.ts';
-import { isRevisitDue } from './search.ts';
+import type { Card } from './card.ts';
 
-export interface BadgeColors {
-  readonly accepted: string;
-  readonly proposed: string;
-  readonly due: string;
-  /** Text on the three coloured segments. */
-  readonly text: string;
-}
+const FALLBACK = '#6B7280';
+const TITLE_BG = '#555';
 
 /* Width estimate for 11px Verdana, as shields.io badges use: ~7px a character, emoji a little wider. */
 const width = (t: string): number => [...t].reduce((w, ch) => w + (/[\p{Extended_Pictographic}]/u.test(ch) ? 14 : /[️]/.test(ch) ? 0 : 7), 0) + 12;
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export const badgeSvg = (adrs: readonly Adr[], today: string, c: BadgeColors): string => {
-  const accepted = adrs.filter((a) => a.status === 'accepted').length;
-  const proposed = adrs.filter((a) => a.status === 'proposed').length;
-  const due = adrs.filter((a) => isRevisitDue(a, today)).length;
-  const parts = [
-    { text: `A: ${accepted} ✅`, bg: c.accepted, fg: c.text },
-    { text: `P: ${proposed} ⏳`, bg: c.proposed, fg: c.text },
-    { text: `D: ${due} ⚠️`, bg: c.due, fg: c.text }
-  ];
+export const badgeSvg = (card: Card): string => {
+  const items = card.legend.map((l) => ({ ...l, n: card.report[l.id] ?? 0 })).filter((l) => l.n > 0);
+  const parts = [{ text: card.title, bg: TITLE_BG }, ...items.map((l) => ({ text: `${l.label} ${l.n}`, bg: l.color ?? FALLBACK }))];
   let x = 0;
   const segs = parts.map((p) => {
     const w = width(p.text);
-    const seg = `<rect x="${x}" width="${w}" height="20" fill="${p.bg}"/><text x="${x + w / 2}" y="14" fill="${p.fg}">${p.text}</text>`;
+    const seg = `<rect x="${x}" width="${w}" height="20" fill="${esc(p.bg)}"/><text x="${x + w / 2}" y="14" fill="#fff">${esc(p.text)}</text>`;
     x += w;
     return seg;
   });
-  const title = `Decisions: ${accepted} accepted, ${proposed} proposed, ${due} due for revisit`;
+  const title = esc(`${card.title}: ${items.length === 0 ? 'none' : items.map((l) => `${l.n} ${l.label.toLowerCase()}`).join(', ')}`);
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${x}" height="20" role="img" aria-label="${title}">`,
     `<title>${title}</title>`,

@@ -1,14 +1,50 @@
 #!/usr/bin/env node
 // adr <file.md>: serves the bundled viewer and that file on localhost, then opens it in the browser.
 // The file is re-read on every request, so reloading the page shows your latest edits.
+// adr card <decisions.md> [out-dir]: writes card.json, the ledger as a dashboard card (out-dir defaults to the file's folder).
+// adr badge <decisions.md> [out-dir]: writes badge.svg, drawn from the same card.
+// Both read the optional sidecar <name>.card.json beside the markdown (titles, legend labels, colours).
+// The card's links open the viewer at ADR_HOST (default https://aaronp.github.io/adr/) with ?src=ADR_SRC,
+// where ADR_SRC is where the published markdown lives (default: the path given, relative to ADR_HOST).
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
+
+/** decisions.md → decisions.card.json (or "<name>.card.json" appended when there is no .md). */
+const sidecarOf = (md) => md.replace(/\.md$/i, '') + '.card.json';
+
+const cmd = process.argv[2];
+if (cmd === 'card' || cmd === 'badge') {
+  const [md, out = dirname(md ?? '')] = process.argv.slice(3);
+  if (!md) { console.error(`Usage: adr ${cmd} <decisions.md> [out-dir]`); process.exit(1); }
+  const { parseLedger, parsePrefs, card, badgeSvg } = await import('../dist/card.mjs');
+  const fail = (where, e) => { console.error(`adr: ${where}: ${e.message ?? e}`); process.exit(1); };
+  const sidecar = sidecarOf(md);
+  let prefs = {};
+  try {
+    const { prefs: p, warnings } = parsePrefs(JSON.parse(await readFile(sidecar, 'utf8')));
+    if (warnings.length > 0) fail(sidecar, warnings.join('; '));
+    prefs = p;
+  } catch (e) {
+    if (e.code !== 'ENOENT') fail(sidecar, e);
+  }
+  try {
+    const c = card(parseLedger(await readFile(md, 'utf8')), prefs, new Date().toLocaleDateString('en-CA'), { label: md, src: process.env.ADR_SRC || md }, process.env.ADR_HOST || undefined);
+    const [name, body] = cmd === 'card' ? ['card.json', JSON.stringify(c, null, 2) + '\n'] : ['badge.svg', badgeSvg(c)];
+    await writeFile(join(out, name), body);
+    console.log(`Wrote ${join(out, name)}`);
+  } catch (e) {
+    fail(md, e);
+  }
+  process.exit(0);
+}
 
 const file = process.argv[2];
 if (!file || file === '-h' || file === '--help') {
   console.error('Usage: adr <decisions.md>   (PORT=8000 to pick the port, NO_OPEN=1 to skip opening a browser)');
+  console.error('       adr card <decisions.md> [out-dir]    (writes card.json)');
+  console.error('       adr badge <decisions.md> [out-dir]   (writes badge.svg)');
   process.exit(file ? 0 : 1);
 }
 const path = resolve(file);
@@ -16,15 +52,18 @@ await readFile(path).catch((e) => { console.error(`adr: cannot read ${file}: ${e
 
 const viewer = new URL('../dist/decision-ledger.html', import.meta.url);
 const route = '/' + encodeURIComponent(basename(path));
+const sidecar = sidecarOf(path);
+const sidecarRoute = '/' + encodeURIComponent(basename(sidecar));
 const server = createServer(async (req, res) => {
   const p = new URL(req.url, 'http://x').pathname;
-  // Only two routes, so nothing else on disk is reachable.
-  const [target, type] = p === '/' ? [viewer, 'text/html'] : p === route ? [path, 'text/markdown'] : [];
+  // Only these routes, so nothing else on disk is reachable.
+  const [target, type] = p === '/' ? [viewer, 'text/html'] : p === route ? [path, 'text/markdown'] : p === sidecarRoute ? [sidecar, 'application/json'] : [];
   if (!target) return res.writeHead(404).end('Not found');
   try {
-    res.writeHead(200, { 'content-type': `${type}; charset=utf-8`, 'cache-control': 'no-store' }).end(await readFile(target));
+    const body = await readFile(target);
+    res.writeHead(200, { 'content-type': `${type}; charset=utf-8`, 'cache-control': 'no-store' }).end(body);
   } catch (e) {
-    res.writeHead(500).end(e.message);
+    res.writeHead(e.code === 'ENOENT' ? 404 : 500).end(e.message);
   }
 });
 

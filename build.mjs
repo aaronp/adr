@@ -48,4 +48,23 @@ await mkdir('dist', { recursive: true });
 // decision-ledger.html is the standalone file to keep or share; index.html is the same page for GitHub Pages.
 await writeFile('dist/decision-ledger.html', html);
 await writeFile('dist/index.html', html);
-console.log(`dist/decision-ledger.html, dist/index.html  ${(html.length / 1024).toFixed(1)} KB`);
+
+// dist/card.mjs: card.json and the badge for the `adr card` / `adr badge` CLI (Node, no DOM).
+await build({
+  stdin: {
+    resolveDir: 'src/core',
+    loader: 'ts',
+    contents: `
+      export { parseLedger } from './markdown.ts';
+      export { card, parsePrefs } from './card.ts';
+      export { badgeSvg } from './badge.ts';`
+  },
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node18',
+  minify: true,
+  outfile: 'dist/card.mjs',
+  logLevel: 'warning'
+});
+console.log(`dist/decision-ledger.html, dist/index.html  ${(html.length / 1024).toFixed(1)} KB, dist/card.mjs`);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialState, reducer, type State } from '../src/ui/state.ts';
-import { fromQuery, pageKey, toQuery } from '../src/ui/url.ts';
+import { cardSrc, fromQuery, pageKey, sidecarUrl, toQuery } from '../src/ui/url.ts';
 import { parseLedger } from '../src/core/markdown.ts';
 import { readSample } from './helpers.ts';
 
@@ -50,4 +50,38 @@ test('url/apply (Back/Forward) moves between screens', () => {
   const s = reducer(start(''), { type: 'url/apply', prefs: { page: { kind: 'markdown' } } });
   assert.equal(s.screen.kind, 'markdown');
   assert.equal(reducer(s, { type: 'url/apply', prefs: { page: { kind: 'dashboard' } } }).screen.kind, 'dashboard');
+});
+
+test('the card designer has its own address', () => {
+  assert.deepEqual(fromQuery('?page=card'), { page: { kind: 'card' } });
+  const s = reducer(start('?src=d.md'), { type: 'nav/card' });
+  assert.deepEqual(s.screen, { kind: 'card' });
+  assert.equal(toQuery(s, '?src=d.md'), '?src=d.md&page=card');
+  assert.equal(pageKey(s), 'card');
+  assert.equal(reducer(start(''), { type: 'url/apply', prefs: { page: { kind: 'card' } } }).screen.kind, 'card');
+  assert.equal(start('?page=card').screen.kind, 'card');
+});
+
+test('the sidecar sits beside the markdown', () => {
+  assert.equal(sidecarUrl('examples/a/decisions.md'), 'examples/a/decisions.card.json');
+  assert.equal(sidecarUrl('https://x/d.md?raw=1'), 'https://x/d.card.json?raw=1');
+  assert.equal(sidecarUrl('https://x/d.md#top'), 'https://x/d.card.json#top');
+  assert.equal(sidecarUrl('notes'), 'notes.card.json');
+});
+
+test('?status= picks the dashboard filter', () => {
+  assert.deepEqual(fromQuery('?status=proposed'), { filter: 'proposed' });
+  assert.deepEqual(fromQuery('?status=revisit'), { filter: 'revisit' });
+  assert.deepEqual(fromQuery('?status=nope'), {});
+  assert.equal(start('?status=accepted').filter, 'accepted');
+  const s = reducer(start('?src=d.md'), { type: 'dash/filter', filter: 'revisit' });
+  assert.equal(toQuery(s, '?src=d.md'), '?src=d.md&status=revisit');
+  assert.equal(toQuery(reducer(s, { type: 'dash/filter', filter: 'all' }), '?src=d.md'), '?src=d.md');
+  assert.equal(reducer(start(''), { type: 'url/apply', prefs: { filter: 'proposed' } }).filter, 'proposed');
+});
+
+test('the designer reads the sidecar beside ?src only when ?src actually loaded', () => {
+  assert.equal(cardSrc('d.md', true), 'd.md');
+  assert.equal(cardSrc('d.md', false), null); // fell back to the saved ledger: use (and keep) the saved card settings
+  assert.equal(cardSrc(null, true), null); // share link
 });

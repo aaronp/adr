@@ -21,6 +21,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - run: npx -y @pritzlaff/adr badge decisions.md && npx -y @pritzlaff/adr card decisions.md   # → badge.svg, card.json
+        env:   # the card's links open the viewer on this site's decisions.md
+          ADR_SRC: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/decisions.md
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

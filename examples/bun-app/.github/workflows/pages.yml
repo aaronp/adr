@@ -21,6 +21,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install && make snapshot ADR_SRC=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/decisions.md
       - uses: actions/upload-pages-artifact@v3
         with:
           path: adr

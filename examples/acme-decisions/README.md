@@ -25,5 +25,9 @@ Your site redirects to the viewer with `?src=` pointing at your `decisions.md`.
 Any query params you add are passed on, e.g. `?adr=ADR-0012&viz=heatmap` or
 `?theme=night`.
 
+The workflow also writes `badge.svg` and `card.json` (`npx @pritzlaff/adr badge|card decisions.md`), so
+`https://you.github.io/your-repo/badge.svg` is a live status badge for your README. To change its title,
+labels or colours, add a `decisions.card.json` (design it in the viewer: File → Design card…).
+
 No Pages? Link straight to the raw file:
 `https://aaronp.github.io/adr/?src=https://raw.githubusercontent.com/<you>/<repo>/<branch>/decisions.md`

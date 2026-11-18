@@ -7,6 +7,6 @@
     "adr": "adr adr/decisions.md"
   },
   "devDependencies": {
-    "@pritzlaff/adr": "^1.0.0"
+    "@pritzlaff/adr": "^1.1.0"
   }
 }

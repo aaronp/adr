@@ -5,7 +5,8 @@
 
 export const STORAGE_KEYS = {
   markdown: 'decision-ledger:markdown:v1',
-  theme: 'decision-ledger:theme:v1'
+  theme: 'decision-ledger:theme:v1',
+  card: 'decision-ledger:card:v1'
 } as const;
 
 /** Storage can be unavailable (private mode, blocked site data). That is reported, not hidden. */

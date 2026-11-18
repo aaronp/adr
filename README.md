@@ -70,7 +70,29 @@ bunx @pritzlaff/adr decisions.md   # or npx; no install needed
 
 It serves the viewer and that file on localhost and opens the browser.
 The file is re-read on each reload. `PORT=8000` fixes the port; `NO_OPEN=1` skips opening a browser.
-The package has no runtime dependencies: it is `bin/adr.mjs` plus the built `dist/decision-ledger.html`.
+The package has no runtime dependencies: it is `bin/adr.mjs` plus the built `dist/decision-ledger.html`
+and `dist/badge.mjs`.
+
+### Card and badge
+
+```sh
+adr card decisions.md [out-dir]    # → card.json: the ledger as a dashboard card (data only)
+adr badge decisions.md [out-dir]   # → badge.svg: drawn from the same card
+```
+
+`card.json` is tool-neutral data (title, status pill, big number, legend with counts, source link) for
+a dashboard to style as it likes; see [spec.md](spec.md#card-and-badge). What it says (titles, legend
+labels, colours, order) comes from an optional `decisions.card.json` beside the markdown. Design one in
+the viewer with **File → Design card…** (`?page=card`), which previews the card and badge and downloads
+the file. Links in the card open the viewer at `ADR_HOST` (default `https://aaronp.github.io/adr/`) on
+`ADR_SRC` (where your published markdown lives), filtered with `?status=proposed|accepted|…|revisit`; set
+both as environment variables. The Pages workflows here and in both examples regenerate both files on
+every push (in [examples/bun-app](examples/bun-app) it is `make snapshot`), so a README can embed the
+live badge:
+
+```md
+[![Decisions](https://you.github.io/your-decisions/badge.svg)](https://you.github.io/your-decisions/)
+```
 
 ### Adding it to your Bun project
 
