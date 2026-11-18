@@ -19,7 +19,8 @@ No install? `bunx @pritzlaff/adr adr/decisions.md` does the same.
 
 `.github/workflows/pages.yml` publishes only the `adr/` folder. Its `index.html`
 redirects to the hosted viewer with `?src=` pointing at your `decisions.md`, as in
-[acme-decisions](../acme-decisions). On GitHub: Settings → Pages → Source: **GitHub Actions**.
+[acme-decisions](../acme-decisions). It also runs `bun run badge`, so
+`adr/badge.svg` is published beside it. On GitHub: Settings → Pages → Source: **GitHub Actions**.
 
 Live copy of this example:
 [aaronp.github.io/adr/?src=examples/bun-app/adr/decisions.md](https://aaronp.github.io/adr/?src=examples/bun-app/adr/decisions.md)

@@ -28,6 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: node bin/adr.mjs badge examples/acme-decisions/decisions.md   # → examples/acme-decisions/badge.svg
       - name: Assemble the site
         run: |
           mkdir _site

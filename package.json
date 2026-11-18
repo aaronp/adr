@@ -14,7 +14,8 @@
   },
   "files": [
     "bin",
-    "dist/decision-ledger.html"
+    "dist/decision-ledger.html",
+    "dist/badge.mjs"
   ],
   "scripts": {
     "build": "node build.mjs",

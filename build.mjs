@@ -48,4 +48,25 @@ await mkdir('dist', { recursive: true });
 // decision-ledger.html is the standalone file to keep or share; index.html is the same page for GitHub Pages.
 await writeFile('dist/decision-ledger.html', html);
 await writeFile('dist/index.html', html);
-console.log(`dist/decision-ledger.html, dist/index.html  ${(html.length / 1024).toFixed(1)} KB`);
+
+// dist/badge.mjs: the same badge for the `adr badge` CLI (Node, no DOM), in the paper theme's colours.
+await build({
+  stdin: {
+    resolveDir: 'src/core',
+    loader: 'ts',
+    contents: `
+      import { parseLedger } from './markdown.ts';
+      import { badgeSvg } from './badge.ts';
+      // ponytail: paper theme colours copied from styles.css; pass a theme if anyone wants night/blueprint badges.
+      export const badge = (markdown: string, today: string) =>
+        badgeSvg(parseLedger(markdown), today, { accepted: '#0B6B5F', proposed: '#1F45B0', due: '#A3283C', text: '#FFFFFF' });`
+  },
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node18',
+  minify: true,
+  outfile: 'dist/badge.mjs',
+  logLevel: 'warning'
+});
+console.log(`dist/decision-ledger.html, dist/index.html  ${(html.length / 1024).toFixed(1)} KB, dist/badge.mjs`);

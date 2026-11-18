@@ -70,7 +70,21 @@ bunx @pritzlaff/adr decisions.md   # or npx; no install needed
 
 It serves the viewer and that file on localhost and opens the browser.
 The file is re-read on each reload. `PORT=8000` fixes the port; `NO_OPEN=1` skips opening a browser.
-The package has no runtime dependencies: it is `bin/adr.mjs` plus the built `dist/decision-ledger.html`.
+The package has no runtime dependencies: it is `bin/adr.mjs` plus the built `dist/decision-ledger.html`
+and `dist/badge.mjs`.
+
+### Status badge
+
+```sh
+adr badge decisions.md [out-dir]   # → badge.svg: accepted / proposed / revisits due
+```
+
+The same badge as **Status badge** in the viewer's file menu, in the paper theme. The Pages workflows
+here and in both examples regenerate it on every push, so a README can embed the live file:
+
+```md
+[![Decisions](https://you.github.io/your-decisions/badge.svg)](https://you.github.io/your-decisions/)
+```
 
 ### Adding it to your Bun project
 

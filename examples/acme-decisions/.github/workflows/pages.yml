@@ -21,6 +21,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - run: npx -y @pritzlaff/adr badge decisions.md   # → badge.svg
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
