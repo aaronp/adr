@@ -25,6 +25,7 @@ interface Design {
   readonly label: string;
   /** All five statuses, in legend order; `on` ones are shown. */
   readonly rows: readonly Row[];
+  readonly hideZero: boolean;
   readonly sourceLabel: string;
 }
 
@@ -43,7 +44,8 @@ const fromPrefs = (p: CardPrefs, sourceLabel: string): Design => {
       const l = listed.find((x) => x.id === id);
       return { id, on: l !== undefined, label: l?.label ?? DEFAULT_LABEL[id], color: l?.color ?? DEFAULT_COLORS[id] };
     }),
-    sourceLabel: c.source.label
+    sourceLabel: c.source.label,
+    hideZero: p.hideZero === true
   };
 };
 
@@ -52,7 +54,8 @@ const toPrefs = (d: Design): CardPrefs => ({
   subtitle: d.subtitle,
   heading: { primary: d.primary, label: d.label },
   legend: d.rows.filter((r) => r.on).map((r) => ({ id: r.id, label: r.label, color: r.color })),
-  source: { label: d.sourceLabel }
+  source: { label: d.sourceLabel },
+  ...(d.hideZero ? { hideZero: true } : {})
 });
 
 /** The design as last edited, kept while the page is open so leaving the designer and coming back keeps unsaved edits. */
@@ -224,6 +227,9 @@ export const CardDesigner = ({ adrs, today, src, store, save, dispatch, fx }: { 
           </div>
           <fieldset class="cd-rows stack-xs">
             <legend class="field-label">Legend</legend>
+            <label class="row-xs small">
+              <input type="checkbox" checked={design.hideZero} onChange={(e) => set({ hideZero: e.currentTarget.checked })} /> Hide items with no records
+            </label>
             {design.rows.map((r, i) => (
               <div key={r.id} class="cd-row">
                 <span class="row-xs">

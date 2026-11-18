@@ -129,3 +129,12 @@ test('badge escapes text', () => {
   assert.match(svg, /R&amp;D &lt;x&gt;/);
   assert.doesNotMatch(svg, /R&D/);
 });
+
+test('hideZero leaves out legend items with no records', () => {
+  const adrs = calm(); // all accepted
+  const c = card(adrs, { hideZero: true }, TODAY, at('d.md'));
+  assert.deepEqual(c.legend.map((l) => l.id), ['accepted']);
+  assert.deepEqual(c.report, { accepted: adrs.length });
+  assert.equal(card(adrs, {}, TODAY, at('d.md')).legend.length, 5);
+  assert.deepEqual(parsePrefs({ hideZero: true }).prefs, { hideZero: true });
+});

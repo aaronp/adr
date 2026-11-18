@@ -214,6 +214,7 @@ The sidecar (every field optional):
 ```
 
 - `heading.primary`: `total` (all records) or a status, whose count becomes the big number.
+- `hideZero`: `true` leaves legend items with no records out of the card (default `false`).
 - `legend`: which statuses to show, in order. Ids must be statuses; an unknown id is an error for the
   CLI and is dropped with a warning in the viewer.
 - Defaults: the values above, all five statuses with these colours — proposed `#1F45B0`, accepted

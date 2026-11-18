@@ -45,6 +45,8 @@ export const CardPrefsSchema = Type.Object(
     legend: Type.Optional(
       Type.Array(Type.Object({ id: StatusId, label: Type.Optional(Type.String()), color: Type.Optional(Type.String()) }, { additionalProperties: false }))
     ),
+    /** Leave legend items with no records out of the card. */
+    hideZero: Type.Optional(Type.Boolean()),
     source: Type.Optional(Type.Object({ label: Type.Optional(Type.String()) }, { additionalProperties: false }))
   },
   { additionalProperties: false }
@@ -102,7 +104,7 @@ export const card = (adrs: readonly Adr[], prefs: CardPrefs, today: string, at: 
   const filtered = (f: Status | 'revisit') => `${open}&status=${f}`;
   const count = (s: Status): number => adrs.filter((a) => a.status === s).length;
   const items: NonNullable<CardPrefs['legend']> = prefs.legend ?? STATUSES.map((id) => ({ id }));
-  const legend = items.map((l) => ({ id: l.id, label: l.label ?? capitalise(l.id), color: l.color ?? DEFAULT_COLORS[l.id], url: filtered(l.id) }));
+  const legend = items.filter((l) => !prefs.hideZero || count(l.id) > 0).map((l) => ({ id: l.id, label: l.label ?? capitalise(l.id), color: l.color ?? DEFAULT_COLORS[l.id], url: filtered(l.id) }));
   const primary = prefs.heading?.primary ?? 'total';
   const due = adrs.filter((a) => isRevisitDue(a, today)).length;
   const proposed = count('proposed');
