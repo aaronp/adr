@@ -73,14 +73,19 @@ The file is re-read on each reload. `PORT=8000` fixes the port; `NO_OPEN=1` skip
 The package has no runtime dependencies: it is `bin/adr.mjs` plus the built `dist/decision-ledger.html`
 and `dist/badge.mjs`.
 
-### Status badge
+### Card and badge
 
 ```sh
-adr badge decisions.md [out-dir]   # → badge.svg: accepted / proposed / revisits due
+adr card decisions.md [out-dir]    # → card.json: the ledger as a dashboard card (data only)
+adr badge decisions.md [out-dir]   # → badge.svg: drawn from the same card
 ```
 
-The same badge as **Status badge** in the viewer's file menu, in the paper theme. The Pages workflows
-here and in both examples regenerate it on every push, so a README can embed the live file:
+`card.json` is tool-neutral data (title, status pill, big number, legend with counts, source link) for
+a dashboard to style as it likes; see [spec.md](spec.md#card-and-badge). What it says (titles, legend
+labels, colours, order) comes from an optional `decisions.card.json` beside the markdown. Design one in
+the viewer with **File → Design card…** (`?page=card`), which previews the card and badge and downloads
+the file. The Pages workflows here and in both examples regenerate both on every push, so a README can
+embed the live badge:
 
 ```md
 [![Decisions](https://you.github.io/your-decisions/badge.svg)](https://you.github.io/your-decisions/)

@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - run: bun install && bun run badge   # → adr/badge.svg
+      - run: bun install && bun run badge   # → adr/badge.svg, adr/card.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: adr

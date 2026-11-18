@@ -5,7 +5,7 @@
   "scripts": {
     "start": "bun index.ts",
     "adr": "adr adr/decisions.md",
-    "badge": "adr badge adr/decisions.md"
+    "badge": "adr badge adr/decisions.md && adr card adr/decisions.md"
   },
   "devDependencies": {
     "@pritzlaff/adr": "^1.0.0"
