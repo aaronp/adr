@@ -4,7 +4,7 @@ import { serializeLedger } from '../../core/markdown.ts';
 import { THEMES, type ThemeId } from '../themes.ts';
 import { Icon, type Dispatch, type Effects } from './common.tsx';
 
-/** New, Open, Download and Share, in a native <details> menu that closes on a pick, Esc or a click elsewhere. */
+/** New, Open, Save (when the file can be written back), Download and Share, in a native <details> menu that closes on a pick, Esc or a click elsewhere. */
 const FileMenu = ({ adrs, dispatch, fx }: { adrs: readonly Adr[]; dispatch: Dispatch; fx: Effects }) => {
   const menu = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -40,6 +40,7 @@ const FileMenu = ({ adrs, dispatch, fx }: { adrs: readonly Adr[]; dispatch: Disp
       <div class="menu-pop" role="menu">
         {item('plus', 'New ledger…', () => dispatch(adrs.length === 0 ? { type: 'file/new' } : { type: 'file/confirmNew' }))}
         {item('upload', 'Open…', () => dispatch({ type: 'open/show' }))}
+        {fx.save !== null ? item('check', 'Save', () => fx.save?.(serializeLedger(adrs))) : null}
         {item('download', 'Download decisions.md', () => fx.download('decisions.md', serializeLedger(adrs)))}
         {item('copy', 'Copy share link', () => fx.share(serializeLedger(adrs)))}
         {item('edit', 'Design card…', () => dispatch({ type: 'nav/card' }))}

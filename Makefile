@@ -22,7 +22,7 @@ dist: check
 publish: check
 	npm publish
 
-# Serves the built page at / and everything else from the repo, as on GitHub Pages (so ?src=examples/... works).
+# Serves the built page at / and the repo beside it (see dev-server.ts); File → Save writes .md files back.
 dev: build
 	@echo "Example: http://localhost:$(PORT)/?src=examples/acme-decisions/decisions.md"
-	@bun -e 'const s = Bun.serve({ port: $(PORT), async fetch(req) { const p = new URL(req.url).pathname; const rel = p.endsWith("/") ? p + "index.html" : p; for (const f of [Bun.file("dist" + rel), Bun.file("." + rel)]) if (await f.exists()) return new Response(f); return new Response("Not found", { status: 404 }); } }); console.log("Serving on " + s.url.href + " (Ctrl-C to stop)")'
+	@PORT=$(PORT) bun dev-server.ts

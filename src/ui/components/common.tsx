@@ -14,6 +14,8 @@ export interface Effects {
   openUrl(url: string): Promise<void>;
   /** Copies a link that carries the whole ledger (see core/share.ts). */
   share(markdown: string): void;
+  /** Writes the ledger back to the file it came from, or null when that file cannot be written (see io.ts putText). */
+  readonly save: ((markdown: string) => void) | null;
 }
 
 const ICONS = {
