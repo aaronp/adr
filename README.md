@@ -136,6 +136,7 @@ Needs Node 22.6+ (tests run TypeScript directly via `--experimental-strip-types`
 | `src/ui/state.ts` | The whole app as one pure reducer |
 | `src/ui/io.ts` · `main.tsx` | The edge: clock, storage, `?src=` fetch, clipboard, file download/upload |
 | `examples/acme-decisions/` | A cloneable data-only repo that points back at this viewer |
+| `examples/bun-app/` | A Bun project with its own `adr/decisions.md`: `bun run adr` opens it locally, Pages publishes it |
 | `src/ui/components/` | Preact views |
 
 Fonts load from Google Fonts when online and fall back to system fonts offline.
