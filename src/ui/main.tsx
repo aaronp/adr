@@ -9,7 +9,7 @@ import { formatDate, toIsoDate } from '../core/dates.ts';
 import { serializeLedger } from '../core/markdown.ts';
 import { createInitialState, reducer, type State } from './state.ts';
 import { cardSrc, fromQuery, pageKey, toQuery } from './url.ts';
-import { STORAGE_KEYS, copyText, createBrowserStore, downloadText, fetchText, readTextFile, type Store } from './io.ts';
+import { STORAGE_KEYS, copyText, createBrowserStore, downloadText, fetchText, putText, readTextFile, type Store } from './io.ts';
 import { Header } from './components/Header.tsx';
 import { Dashboard } from './components/Dashboard.tsx';
 import { AdrView } from './components/AdrView.tsx';
@@ -31,6 +31,8 @@ interface AppProps {
   readonly initial: State;
   readonly store: Store | null;
   readonly storage: { available: true } | { available: false; reason: string };
+  /** URL that File → Save writes back to (served by the `adr` CLI), or null when there is none. */
+  readonly saveUrl: string | null;
   /** Why the requested ?src= or #data= could not be opened, shown as a modal until dismissed. */
   readonly loadError: string | null;
 }
@@ -63,8 +65,17 @@ const LoadErrorDialog = ({ text, onClose }: { text: string; onClose: () => void 
   );
 };
 
-const App = ({ today, initial, store, storage, saveMarkdown, src, loadError }: AppProps) => {
-  const [state, dispatch] = useReducer(reducer, initial);
+const App = ({ today, initial, store, storage, saveMarkdown, src, saveUrl: initialSaveUrl, loadError }: AppProps) => {
+  const [state, rawDispatch] = useReducer(reducer, initial);
+  const [saveUrl, setSaveUrl] = useState(initialSaveUrl);
+  // Loading another file (Open, or the sample) means Save would overwrite the served file with unrelated content, so it goes away.
+  const dispatch: typeof rawDispatch = useMemo(
+    () => (a) => {
+      if (a.type === 'md/load') setSaveUrl(null);
+      rawDispatch(a);
+    },
+    []
+  );
   const [alert, setAlert] = useState(loadError);
 
   // Persist applied records (not unapplied editor text) and the theme.
@@ -159,9 +170,18 @@ const App = ({ today, initial, store, storage, saveMarkdown, src, loadError }: A
           (e: unknown) => {
             throw new Error(`Could not open ${url}: ${e instanceof Error ? e.message : String(e)}. A URL on another site must allow cross-origin requests (GitHub Pages and raw.githubusercontent.com do).`);
           }
-        )
+        ),
+      save:
+        saveUrl === null
+          ? null
+          : (markdown) => {
+              putText(saveUrl, markdown).then(
+                () => dispatch({ type: 'toast/show', kind: 'ok', text: `Saved ${decodeURIComponent(new URL(saveUrl).pathname.split('/').pop() ?? saveUrl)}.` }),
+                (e: unknown) => dispatch({ type: 'toast/show', kind: 'error', text: `Could not save: ${e instanceof Error ? e.message : String(e)}. Download the file to keep your work.` })
+              );
+            }
     }),
-    []
+    [saveUrl]
   );
 
   const onNew = () => dispatch({ type: 'edit/new', today });
@@ -220,11 +240,11 @@ const storage = browser.available ? ({ available: true } as const) : ({ availabl
 /** ?src=<url> (alias ?ours=), absolute or relative to the page: the markdown to show instead of the stored or sample file. */
 const srcParam = new URLSearchParams(location.search).get('src') ?? new URLSearchParams(location.search).get('ours');
 
-const boot = (source: { url: string; markdown: string } | null, loadError: string | null) => {
+const boot = (source: { url: string; markdown: string; writable?: boolean } | null, loadError: string | null) => {
   const initial = createInitialState({ source, storedMarkdown: read(STORAGE_KEYS.markdown), storedTheme: read(STORAGE_KEYS.theme), sampleMarkdown, prefs: fromQuery(location.search) });
   const warning = browser.available ? null : 'This browser is blocking storage, so nothing will be remembered. Download decisions.md to keep your work.';
   const withWarning: State = warning === null ? initial : { ...initial, seq: initial.seq + 1, toast: { id: initial.seq, kind: 'error', text: warning } };
-  render(<App today={toIsoDate(new Date())} initial={withWarning} store={store} storage={storage} saveMarkdown={source === null} src={cardSrc(srcParam, source !== null)} loadError={loadError} />, root);
+  render(<App today={toIsoDate(new Date())} initial={withWarning} store={store} storage={storage} saveMarkdown={source === null} src={cardSrc(srcParam, source !== null)} saveUrl={source?.writable === true ? source.url : null} loadError={loadError} />, root);
 };
 
 /** #data=<packed> (from File → Copy share link): the whole ledger carried in the link itself. Like ?src=, it is not autosaved. */

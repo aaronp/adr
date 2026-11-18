@@ -58,9 +58,16 @@ export const readTextFile = async (file: File): Promise<string> => {
 };
 
 /** Fetches a markdown file from a URL (absolute, or relative to the page). Sources on another host must allow CORS. */
-export const fetchText = async (raw: string): Promise<{ url: string; markdown: string }> => {
+export const fetchText = async (raw: string): Promise<{ url: string; markdown: string; writable: boolean }> => {
   const url = new URL(raw, location.href);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return { url: url.href, markdown: await res.text() };
+  // Set by the `adr` CLI server, which accepts a PUT of the file back to the same URL.
+  return { url: url.href, markdown: await res.text(), writable: res.headers.get('x-adr-writable') === '1' };
+};
+
+/** Overwrites the file at a URL served by the `adr` CLI (see fetchText's `writable`). */
+export const putText = async (url: string, text: string): Promise<void> => {
+  const res = await fetch(url, { method: 'PUT', body: text, headers: { 'content-type': 'text/markdown;charset=utf-8' } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}`);
 };
