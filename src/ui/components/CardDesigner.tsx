@@ -9,7 +9,7 @@ import { STATUSES } from '../../core/schema.ts';
 import { DEFAULT_COLORS, card, parsePrefs, type Card, type CardPrefs } from '../../core/card.ts';
 import { badgeSvg } from '../../core/badge.ts';
 import { STORAGE_KEYS, fetchText, type Store } from '../io.ts';
-import { sidecarUrl } from '../url.ts';
+import { safeHref, sidecarUrl } from '../url.ts';
 import { Icon, Kicker, type Dispatch, type Effects } from './common.tsx';
 
 interface Row {
@@ -58,6 +58,9 @@ const toPrefs = (d: Design): CardPrefs => ({
   source: { label: d.sourceLabel, ...(d.sourceUrl !== '' ? { url: d.sourceUrl } : {}) }
 });
 
+/** The design as last edited, kept while the page is open so leaving the designer and coming back keeps unsaved edits. */
+let kept: { readonly src: string | null; readonly design: Design } | null = null;
+
 const TONE: Record<Card['status']['tone'], string> = { good: 'cd-good', warn: 'cd-warn', bad: 'cd-bad', neutral: 'cd-neutral' };
 
 /** A plain rendering of card.json, shaped like a dashboard tile. Only a preview: dashboards style cards their own way. */
@@ -80,13 +83,13 @@ const CardPreview = ({ c }: { c: Card }) => {
       <div class="cd-legend">
         {items.map((i) => (
           <span key={i.id} class="row-xs">
-            <span class="cd-swatch" style={{ background: i.color }} /> {i.url !== undefined ? <a href={i.url}>{i.label}</a> : i.label} <strong>{i.n}</strong>
+            <span class="cd-swatch" style={{ background: i.color }} /> {safeHref(i.url) !== undefined ? <a href={safeHref(i.url)}>{i.label}</a> : i.label} <strong>{i.n}</strong>
           </span>
         ))}
       </div>
       <div class="row-between cd-foot">
         <span class="mono small">{c.source.label}</span>
-        {c.source.url !== undefined ? <a href={c.source.url}>Open →</a> : <span class="muted">Open →</span>}
+        {safeHref(c.source.url) !== undefined ? <a href={safeHref(c.source.url)}>Open →</a> : <span class="muted">Open →</span>}
       </div>
     </div>
   );
@@ -98,6 +101,10 @@ export const CardDesigner = ({ adrs, today, src, store, save, dispatch, fx }: { 
   const [notes, setNotes] = useState<readonly string[]>([]);
 
   useEffect(() => {
+    if (kept !== null && kept.src === src) {
+      setDesign(kept.design);
+      return;
+    }
     const load = (text: string | null, where: string, extra: string[] = []) => {
       if (text === null) {
         setDesign(fromPrefs({}, defaultSource));
@@ -128,6 +135,7 @@ export const CardDesigner = ({ adrs, today, src, store, save, dispatch, fx }: { 
   }, [src]);
 
   useEffect(() => {
+    if (design !== null) kept = { src, design };
     if (design === null || !save || store === null) return;
     try {
       store.write(STORAGE_KEYS.card, JSON.stringify(toPrefs(design)));

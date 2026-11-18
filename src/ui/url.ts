@@ -63,3 +63,16 @@ export const sidecarUrl = (src: string): string => {
   const [path, rest] = cut === -1 ? [src, ''] : [src.slice(0, cut), src.slice(cut)];
   return path.replace(/\.md$/i, '') + '.card.json' + rest;
 };
+
+/** A card link that is safe to put in an href: http(s) or a relative path. Anything else (javascript:, data:) is dropped. */
+export const safeHref = (u: string | undefined): string | undefined => {
+  if (u === undefined) return undefined;
+  try {
+    return ['http:', 'https:'].includes(new URL(u, 'https://relative.invalid/').protocol) ? u : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** The ?src the card designer should read its sidecar beside: only when that file is what is showing (it loaded). */
+export const cardSrc = (srcParam: string | null, loaded: boolean): string | null => (loaded ? srcParam : null);

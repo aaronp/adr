@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialState, reducer, type State } from '../src/ui/state.ts';
-import { fromQuery, pageKey, sidecarUrl, toQuery } from '../src/ui/url.ts';
+import { cardSrc, fromQuery, pageKey, safeHref, sidecarUrl, toQuery } from '../src/ui/url.ts';
 import { parseLedger } from '../src/core/markdown.ts';
 import { readSample } from './helpers.ts';
 
@@ -67,4 +67,19 @@ test('the sidecar sits beside the markdown', () => {
   assert.equal(sidecarUrl('https://x/d.md?raw=1'), 'https://x/d.card.json?raw=1');
   assert.equal(sidecarUrl('https://x/d.md#top'), 'https://x/d.card.json#top');
   assert.equal(sidecarUrl('notes'), 'notes.card.json');
+});
+
+test('card links only allow web addresses', () => {
+  assert.equal(safeHref('https://x.org/a'), 'https://x.org/a');
+  assert.equal(safeHref('docs/adr/'), 'docs/adr/');
+  assert.equal(safeHref('javascript:alert(1)'), undefined);
+  assert.equal(safeHref(' JavaScript:alert(1)'), undefined);
+  assert.equal(safeHref('data:text/html,<b>x</b>'), undefined);
+  assert.equal(safeHref(undefined), undefined);
+});
+
+test('the designer reads the sidecar beside ?src only when ?src actually loaded', () => {
+  assert.equal(cardSrc('d.md', true), 'd.md');
+  assert.equal(cardSrc('d.md', false), null); // fell back to the saved ledger: use (and keep) the saved card settings
+  assert.equal(cardSrc(null, true), null); // share link
 });
