@@ -40,7 +40,8 @@ const ICONS = {
   swap: 'M4 8h14l-4-4M20 16H6l4 4',
   archive: 'M3 4h18v5H3zM5 9v11h14V9M10 13h4',
   filter: 'M3 5h18l-7 8v6l-4 2v-8z',
-  ban: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8'
+  ban: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8',
+  save: 'M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6'
 } as const;
 export type IconName = keyof typeof ICONS;
 

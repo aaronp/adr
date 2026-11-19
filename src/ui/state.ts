@@ -132,7 +132,7 @@ const createStartState = (input: InitInput): State => {
     query: '',
     filter: 'all' as Filter,
     tags: [],
-    layout: 'list' as LayoutId,
+    layout: 'tree' as LayoutId,
     expanded: {},
     hidden: {},
     seq: 1,

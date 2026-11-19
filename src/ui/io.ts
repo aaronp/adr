@@ -6,7 +6,8 @@
 export const STORAGE_KEYS = {
   markdown: 'decision-ledger:markdown:v1',
   theme: 'decision-ledger:theme:v1',
-  card: 'decision-ledger:card:v1'
+  card: 'decision-ledger:card:v1',
+  autosave: 'decision-ledger:autosave:v1'
 } as const;
 
 /** Storage can be unavailable (private mode, blocked site data). That is reported, not hidden. */
@@ -66,8 +67,8 @@ export const fetchText = async (raw: string): Promise<{ url: string; markdown: s
   return { url: url.href, markdown: await res.text(), writable: res.headers.get('x-adr-writable') === '1' };
 };
 
-/** Overwrites the file at a URL served by the `adr` CLI (see fetchText's `writable`). */
-export const putText = async (url: string, text: string): Promise<void> => {
-  const res = await fetch(url, { method: 'PUT', body: text, headers: { 'content-type': 'text/markdown;charset=utf-8' } });
+/** Overwrites the file at a URL served by the `adr` CLI (see fetchText's `writable`). `keepalive` lets the write outlive the page (bodies up to 64KB). */
+export const putText = async (url: string, text: string, keepalive: boolean): Promise<void> => {
+  const res = await fetch(url, { method: 'PUT', body: text, keepalive, headers: { 'content-type': 'text/markdown;charset=utf-8' } });
   if (!res.ok) throw new Error(`HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}`);
 };
