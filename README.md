@@ -6,6 +6,66 @@
 Architecture decision records (ADRs) driven by **one markdown file**. Open `dist/decision-ledger.html` in any browser. No server or install is needed.
 This repo is the viewer; your decisions can live in their own repo and be loaded with `?src=` (see [Publishing your own ledger](#publishing-your-own-ledger)).
 
+## Adding it to your project
+
+From your project's root (Bun shown; `npm i -D`, `npm pkg set` and `npm run` work the same):
+
+```sh
+bun add -d @pritzlaff/adr
+bun pm pkg set scripts.adr="adr docs/adr/decisions.md"
+mkdir -p docs/adr
+cat > docs/adr/decisions.md <<'EOF'
+---
+title: Keep project docs as markdown next to the code
+status: accepted
+date: 2026-11-19
+tags: process
+decision: md
+---
+
+## Goal
+Keep goals, risks and decisions current without a separate tool.
+
+## People
+- Priya Shah — decider
+- Tom Okafor — author
+
+## Criteria
+| id | criterion | weight | description |
+| --- | --- | --- | --- |
+| upkeep | Easy to keep current | 5 | Higher = less effort. |
+| review | Reviewed with the code | 4 | Higher = shows up in pull requests. |
+
+## Solution: md — Markdown in the repo
+| criterion | score |
+| --- | --- |
+| upkeep | 4 |
+| review | 5 |
+
+## Solution: wiki — Team wiki
+| criterion | score |
+| --- | --- |
+| upkeep | 3 |
+| review | 1 |
+
+## Decision
+Markdown in the repo: it changes in the same pull request as the code it describes.
+EOF
+bun run adr    # opens it on localhost
+```
+
+That is a complete ledger with one accepted record, `ADR-0001`. Add records by appending another
+`---` front-matter block, or with **New** in the viewer; **File → Save** writes your edits back to
+`docs/adr/decisions.md`, so commit it like any other source. A record needs only a `title:`;
+the full format is in **[spec.md](spec.md)**, also published at <https://aaronp.github.io/adr/spec.md> and shipped in the package as `node_modules/@pritzlaff/adr/spec.md`, so people and agents working in your repo can read the version they run.
+
+`adr card docs/adr/decisions.md` and `adr badge docs/adr/decisions.md` write `card.json` and `badge.svg`
+beside it, for a dashboard or a README badge ([Card and badge](#card-and-badge)).
+To publish the ledger on GitHub Pages as well, copy `adr/index.html` and `.github/workflows/pages.yml` from
+[examples/bun-app](examples/bun-app), which is this setup end to end with the file in `adr/`
+(change that path in the workflow to match yours).
+[aaronp/template](https://github.com/aaronp/template) is a project with this and its sibling tools (goals, architecture, decisions, risks, schedule, delivery) set up together behind one dashboard.
+
 - **Dashboard** with search (title, goal, people, tags, options, criteria), status filters and revisit-due tracking.
 - **Hierarchy**: give a record a `parent:` and the dashboard can show it as a list, an indented hierarchy, or a sankey of decisions flowing into sub-decisions. Each record links to its parent and children.
 - **ADR view** with goal, hypothesis, people, timeline, collapsible solutions, and four comparison views: matrix, radar, weighted bars and heatmap.
@@ -93,31 +153,6 @@ live badge:
 ```md
 [![Decisions](https://you.github.io/your-decisions/badge.svg)](https://you.github.io/your-decisions/)
 ```
-
-### Adding it to your Bun project
-
-From your project's root:
-
-```sh
-bun add -d @pritzlaff/adr
-bun pm pkg set scripts.adr="adr adr/decisions.md"
-mkdir -p adr
-cat > adr/decisions.md <<'EOF'
----
-title: Record architecture decisions in adr/decisions.md
----
-We want decisions reviewed in pull requests and kept next to the code they shape.
-EOF
-bun run adr
-```
-
-That is a complete ledger: one proposed record, `ADR-0001`. Add records by appending another
-`---` front-matter block to the file, or with **New** in the viewer. See [spec.md](spec.md) for every
-field. Edits made in the viewer are not written back to disk: use **Download** and save over
-`adr/decisions.md`, then commit it.
-
-To publish the ledger on GitHub Pages as well, copy `adr/index.html` and `.github/workflows/pages.yml`
-from [examples/bun-app](examples/bun-app), which is this setup end to end.
 
 ### Releasing
 

@@ -15,7 +15,8 @@
   "files": [
     "bin",
     "dist/decision-ledger.html",
-    "dist/card.mjs"
+    "dist/card.mjs",
+    "spec.md"
   ],
   "scripts": {
     "build": "node build.mjs",

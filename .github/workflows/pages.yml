@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir _site
           cp dist/index.html dist/decision-ledger.html _site/
-          cp -R examples _site/
+          cp -R examples spec.md _site/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
