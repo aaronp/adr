@@ -52,7 +52,7 @@ export const toQuery = (s: State, search: string): string | null => {
   if (s.screen.kind === 'view') q.set('adr', s.screen.id);
   if (s.screen.kind === 'markdown') q.set('page', 'markdown');
   if (s.screen.kind === 'card') q.set('page', 'card');
-  if (s.screen.kind === 'dashboard' && s.layout !== 'list') q.set('layout', s.layout);
+  if (s.screen.kind === 'dashboard' && s.layout !== 'tree') q.set('layout', s.layout);
   if (s.screen.kind === 'dashboard' && s.filter !== 'all') q.set('status', s.filter);
   if (s.viz !== DEFAULT_VIZ) q.set('viz', s.viz);
   if (s.theme !== DEFAULT_THEME) q.set('theme', s.theme);

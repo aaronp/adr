@@ -87,6 +87,54 @@ const App = ({ today, initial, store, storage, saveMarkdown, src, saveUrl: initi
       dispatch({ type: 'toast/show', kind: 'error', text: `Could not save in this browser: ${e instanceof Error ? e.message : String(e)}. Download the file to keep your work.` });
     }
   }, [state.adrs, store, saveMarkdown]);
+  // Write applied records back to the served file (see fx.save): `saved` is the text known to be on disk.
+  const text = useMemo(() => serializeLedger(state.adrs), [state.adrs]);
+  const [saved, setSaved] = useState(text);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [autosave, setAutosave] = useState(() => store?.read(STORAGE_KEYS.autosave) !== '0');
+  const writeFile = (url: string, body: string, keepalive: boolean) =>
+    putText(url, body, keepalive).then(
+      () => {
+        setSaved(body);
+        setSaveFailed(false);
+      },
+      (e: unknown) => {
+        setSaveFailed(true);
+        throw e;
+      }
+    );
+  // Autosave, debounced so typing in a form is one write. A failed write retries on the next edit.
+  useEffect(() => {
+    if (saveUrl === null || !autosave || text === saved) return;
+    const write = (keepalive: boolean) =>
+      writeFile(saveUrl, text, keepalive).catch((e: unknown) =>
+        dispatch({ type: 'toast/show', kind: 'error', text: `Could not autosave: ${e instanceof Error ? e.message : String(e)}. Download the file to keep your work.` })
+      );
+    const t = setTimeout(() => write(false), 800);
+    // Closing the tab inside the debounce window still writes the last edit.
+    const flush = () => write(true);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, [text, saved, saveUrl, autosave]);
+  const fileStatus =
+    saveUrl === null
+      ? null
+      : {
+          state: saveFailed ? ('error' as const) : text === saved ? ('saved' as const) : autosave ? ('saving' as const) : ('unsaved' as const),
+          autosave,
+          toggleAutosave: () => {
+            const on = !autosave;
+            setAutosave(on);
+            try {
+              store?.write(STORAGE_KEYS.autosave, on ? '1' : '0');
+            } catch {
+              // Not remembered next time; the markdown autosave already reports blocked storage.
+            }
+          }
+        };
   useEffect(() => {
     if (store === null) return;
     try {
@@ -175,7 +223,7 @@ const App = ({ today, initial, store, storage, saveMarkdown, src, saveUrl: initi
         saveUrl === null
           ? null
           : (markdown) => {
-              putText(saveUrl, markdown).then(
+              writeFile(saveUrl, markdown, false).then(
                 () => dispatch({ type: 'toast/show', kind: 'ok', text: `Saved ${decodeURIComponent(new URL(saveUrl).pathname.split('/').pop() ?? saveUrl)}.` }),
                 (e: unknown) => dispatch({ type: 'toast/show', kind: 'error', text: `Could not save: ${e instanceof Error ? e.message : String(e)}. Download the file to keep your work.` })
               );
@@ -214,7 +262,7 @@ const App = ({ today, initial, store, storage, saveMarkdown, src, saveUrl: initi
 
   return (
     <div class="app">
-      <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} adrs={state.adrs} dispatch={dispatch} fx={fx} />
+      <Header theme={state.theme} todayLabel={formatDate(today)} onNew={onNew} adrs={state.adrs} file={fileStatus} dispatch={dispatch} fx={fx} />
       {body}
       {state.openDialog ? <OpenDialog dispatch={dispatch} fx={fx} /> : null}
       {alert !== null ? <LoadErrorDialog text={alert} onClose={() => setAlert(null)} /> : null}
